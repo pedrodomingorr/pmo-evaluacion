@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluación de Madurez PMO</title>
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    :root {
+      --bg:        #F2F0EB;
+      --surface:   #FFFFFF;
+      --text:      #1C1917;
+      --muted:     #78716C;
+      --border:    #E5E2DB;
+      --radius:    18px;
+      --shadow:    0 1px 3px rgba(0,0,0,.05), 0 8px 32px rgba(0,0,0,.08);
+      --cat:       #1B3575;
+      --cat-light: #EEF2FF;
+      --cat-rgb:   27,53,117;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Progress bar ── */
+    #progressTrack { position: fixed; top:0; left:0; right:0; height:3px; background:var(--border); z-index:200; display:none; }
+    #progressFill  { height:100%; background:var(--cat); transition: width .5s ease, background .4s ease; }
+
+    /* ── Shell ── */
+    #app { display:flex; flex-direction:column; align-items:center; padding:64px 16px 100px; min-height:100vh; }
+
+    /* ── Animations ── */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes spin   { to { transform:rotate(360deg); } }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    .fade-up { animation: fadeUp .35s cubic-bezier(.22,.68,0,1.2) forwards; }
+
+    /* ── Loading ── */
+    .screen-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; min-height:80vh; }
+    .spinner { width:28px; height:28px; border:2px solid var(--border); border-top-color:var(--text); border-radius:50%; animation:spin .75s linear infinite; }
+
+    /* ── Card ── */
+    .card { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); width:100%; max-width:700px; padding:36px; }
+
+    /* ── Forms ── */
+    .reg-logo  { font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+    .reg-title { font-family:'Fraunces',serif; font-size:30px; font-weight:600; line-height:1.2; margin-bottom:10px; }
+    .reg-sub   { font-size:14px; color:var(--muted); line-height:1.65; margin-bottom:32px; }
+    .reg-sub strong { color:var(--text); }
+    .form-group { margin-bottom:20px; }
+    .form-label { display:block; font-size:11px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+    .form-input { width:100%; padding:13px 16px; border:1.5px solid var(--border); border-radius:10px; font-family:'DM Sans',sans-serif; font-size:15px; color:var(--text); background:var(--surface); transition:border-color .2s, box-shadow .2s; outline:none; }
+    .form-input:focus { border-color:var(--cat); box-shadow:0 0 0 3px rgba(var(--cat-rgb),.1); }
+    .form-input::placeholder { color:#C8BFB8; }
+    .form-input.error { border-color:#E87820; }
+    select.form-input { appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2378716C' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 16px center; padding-right:44px; cursor:pointer; }
+    select.form-input option[value=""] { color:var(--muted); }
+
+    /* ── Buttons ── */
+    .btn-primary { width:100%; padding:15px 24px; background:var(--text); color:white; border:none; border-radius:11px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; transition:opacity .2s; margin-top:4px; }
+    .btn-primary:hover:not(:disabled) { opacity:.85; }
+    .btn-primary:disabled { opacity:.35; cursor:not-allowed; }
+    .btn-cat   { display:inline-flex; align-items:center; gap:8px; padding:15px 36px; background:var(--cat); color:white; border:none; border-radius:11px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; transition:opacity .2s; }
+    .btn-cat:hover { opacity:.85; }
+    .btn-back  { flex:0 0 auto; padding:13px 20px; border:1.5px solid var(--border); border-radius:11px; background:var(--surface); color:var(--muted); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; transition:all .18s; }
+    .btn-back:hover { border-color:var(--text); color:var(--text); }
+    .btn-next  { flex:1; padding:15px 24px; background:var(--cat); color:white; border:none; border-radius:11px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; transition:opacity .2s; }
+    .btn-next:hover:not(:disabled) { opacity:.85; }
+    .btn-next:disabled { opacity:.3; cursor:not-allowed; }
+    .nav-row   { display:flex; gap:12px; margin-top:28px; }
+
+    /* ── Category intro ── */
+    .cat-intro { width:100%; max-width:560px; text-align:center; padding:40px 16px; }
+    .cat-orb   { width:88px; height:88px; border-radius:50%; background:var(--cat); display:flex; align-items:center; justify-content:center; font-size:38px; margin:0 auto 28px; box-shadow:0 8px 32px rgba(var(--cat-rgb),.25); }
+    .cat-badge-pill { display:inline-flex; align-items:center; gap:6px; padding:6px 18px; border-radius:99px; background:var(--cat-light); color:var(--cat); font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:18px; }
+    .cat-heading { font-family:'Fraunces',serif; font-size:42px; font-weight:600; line-height:1.1; color:var(--text); margin-bottom:16px; }
+    .cat-desc   { font-size:16px; color:var(--muted); line-height:1.75; margin-bottom:20px; }
+    .cat-count-label { font-size:14px; font-weight:600; color:var(--cat); margin-bottom:36px; }
+
+    /* ── Group header ── */
+    .group-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    .group-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 13px; border-radius:99px; background:var(--cat-light); color:var(--cat); font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+    .group-prog { font-size:13px; font-weight:600; color:var(--muted); }
+    .group-prog span { color:var(--cat); }
+
+    /* ── Accordion ── */
+    .accordion { display:flex; flex-direction:column; gap:8px; }
+
+    .acc-item { border:1.5px solid var(--border); border-radius:14px; overflow:hidden; transition:border-color .2s; background:var(--surface); }
+    .acc-item.open   { border-color:var(--cat); }
+    .acc-item.done   { border-color:#86EFAC; background:#F0FDF4; }
+    .acc-item.done.open { border-color:var(--cat); background:var(--surface); }
+
+    .acc-header { display:flex; align-items:center; gap:12px; padding:14px 18px; cursor:pointer; user-select:none; transition:background .15s; }
+    .acc-header:hover { background:var(--bg); }
+    .acc-item.open .acc-header  { background:rgba(var(--cat-rgb),.04); }
+    .acc-item.done .acc-header  { background:#F0FDF4; }
+    .acc-item.done.open .acc-header { background:rgba(var(--cat-rgb),.04); }
+
+    .acc-status { font-size:18px; line-height:1; flex-shrink:0; width:24px; text-align:center; }
+    .acc-info   { flex:1; min-width:0; }
+    .acc-name   { font-size:14px; font-weight:600; color:var(--text); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .acc-result { font-size:12px; color:var(--muted); margin-top:2px; display:none; }
+    .acc-item.done .acc-result { display:block; }
+    .acc-chevron { font-size:11px; color:var(--muted); flex-shrink:0; transition:transform .25s; }
+    .acc-item.open .acc-chevron { transform:rotate(180deg); }
+
+    /* Body — CSS max-height transition */
+    .acc-body { max-height:0; overflow:hidden; transition:max-height .3s ease; }
+    .acc-item.open .acc-body { max-height:900px; }
+    .acc-inner { padding:4px 18px 20px; border-top:1px solid var(--border); }
+    .acc-item.open .acc-inner { border-top-color:rgba(var(--cat-rgb),.15); }
+
+    .acc-svc-desc { font-size:13px; color:var(--muted); line-height:1.6; margin:14px 0 18px; padding:12px 14px; background:var(--bg); border-radius:10px; }
+
+    /* ── Applies row ── */
+    .applies-row { display:flex; gap:8px; margin-bottom:18px; }
+    .ap-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 6px 10px; border:1.5px solid var(--border); border-radius:11px; cursor:pointer; transition:all .15s; background:white; font-family:'DM Sans',sans-serif; }
+    .ap-btn:hover  { border-color:var(--cat); background:var(--cat-light); }
+    .ap-btn.sel    { border-color:var(--cat); background:var(--cat-light); }
+    .ap-icon { font-size:18px; }
+    .ap-label { font-size:12px; font-weight:600; color:var(--text); }
+    .ap-hint  { font-size:10px; color:var(--muted); }
+
+    /* ── Compact level row ── */
+    .levels-block { margin-bottom:14px; }
+    .lvl-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .lvl-label  { font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+    .lvl-req    { font-size:10px; color:#E87820; font-weight:600; }
+    .lvl-opt    { font-size:10px; color:var(--muted); }
+
+    .lvl-pills  { display:flex; gap:6px; }
+    .lvl-pill   { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 2px 7px; border:1.5px solid var(--border); border-radius:9px; cursor:pointer; transition:all .14s; background:white; }
+    .lvl-pill:hover:not(.sel) { border-color:var(--cat); transform:translateY(-1px); }
+    .lvl-pill.sel { border-color:var(--cat); background:var(--cat); transform:translateY(-1px); box-shadow:0 3px 10px rgba(var(--cat-rgb),.2); }
+    .lvl-num  { font-family:'Fraunces',serif; font-size:18px; font-weight:600; color:var(--text); line-height:1; }
+    .lvl-pill.sel .lvl-num { color:white; }
+    .lvl-tag  { font-size:8px; font-weight:600; color:var(--muted); text-align:center; line-height:1.2; max-width:52px; }
+    .lvl-pill.sel .lvl-tag { color:rgba(255,255,255,.85); }
+
+    /* ── Level description panel ── */
+    .lvl-desc-panel { margin-top:10px; padding:12px 14px; background:var(--bg); border-radius:10px; border-left:3px solid var(--cat); animation:fadeIn .2s ease; }
+    .lvl-desc-title { font-size:12px; font-weight:700; color:var(--text); margin-bottom:6px; }
+    .lvl-desc-bullets { list-style:none; padding:0; display:flex; flex-direction:column; gap:4px; }
+    .lvl-desc-bullets li { font-size:12px; color:var(--muted); line-height:1.5; padding-left:14px; position:relative; }
+    .lvl-desc-bullets li::before { content:"›"; position:absolute; left:0; color:var(--cat); font-weight:700; }
+
+    /* ── Gap chip ── */
+    .gap-chip { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:8px; font-size:12px; font-weight:500; margin-bottom:14px; animation:fadeIn .2s; }
+    .gap-chip.pos { background:#ECFDF5; color:#175C3A; }
+    .gap-chip.neu { background:var(--bg); color:var(--muted); }
+    .gap-chip.neg { background:#FFF7ED; color:#7C2D12; }
+
+    /* ── Notes ── */
+    .notes-area { width:100%; padding:10px 14px; border:1.5px solid var(--border); border-radius:10px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text); background:white; resize:vertical; min-height:60px; outline:none; transition:border-color .2s; }
+    .notes-area:focus { border-color:var(--cat); }
+    .notes-area::placeholder { color:#C8BFB8; }
+    .notes-label { font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; margin-top:14px; display:block; }
+
+    /* ── Thank you ── */
+    .ty-wrap  { text-align:center; max-width:480px; margin:auto; padding:48px 16px; }
+    .ty-check { width:72px; height:72px; border-radius:50%; background:#ECFDF5; display:flex; align-items:center; justify-content:center; font-size:32px; margin:0 auto 24px; }
+    .ty-title { font-family:'Fraunces',serif; font-size:36px; font-weight:600; margin-bottom:14px; }
+    .ty-msg   { font-size:16px; color:var(--muted); line-height:1.75; }
+    .ty-msg strong { color:var(--text); }
+    .ty-stats { display:flex; justify-content:center; gap:32px; margin-top:32px; padding-top:28px; border-top:1px solid var(--border); }
+    .ty-stat-num   { font-family:'Fraunces',serif; font-size:32px; font-weight:600; color:var(--cat); }
+    .ty-stat-label { font-size:12px; color:var(--muted); margin-top:4px; }
+
+    /* ── Save toast ── */
+    #savingBadge { position:fixed; bottom:24px; right:24px; background:var(--text); color:white; padding:10px 18px; border-radius:99px; font-size:13px; font-weight:500; display:none; align-items:center; gap:8px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.2); }
+    #savingBadge.show { display:flex; animation:fadeIn .2s; }
+    .sm-spinner { width:13px; height:13px; border:1.5px solid rgba(255,255,255,.3); border-top-color:white; border-radius:50%; animation:spin .7s linear infinite; }
+
+    /* ── Mobile ── */
+    @media (max-width:520px) {
+      .card { padding:24px 16px; }
+      .cat-heading { font-size:32px; }
+      .acc-name { font-size:13px; }
+      .lvl-num { font-size:15px; }
+      .lvl-tag { font-size:7px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="progressTrack"><div id="progressFill"></div></div>
+<div id="app">
+  <div class="screen-loading">
+    <div class="spinner"></div>
+    <p style="font-size:14px;color:var(--muted)">Cargando evaluación…</p>
+  </div>
+</div>
+<div id="savingBadge"><div class="sm-spinner"></div>Guardando…</div>
+
+<script>
+/* ── Config ── */
+const SB_URL = 'https://yhmrxwloxwkjatxoqxhs.supabase.co';
+const SB_KEY = 'sb_publishable_XZQk6N1xCuiSCJB10CbcHw_GkFuyJhJ';
+const ORG    = 'Avila Tek';
+
+const CATS = {
+  strategic:   { name:'Estratégico',  icon:'🎯', color:'#1B3575', rgb:'27,53,117',  light:'#EEF2FF', desc:'Servicios orientados a la alineación con la estrategia organizacional, la gobernanza del portafolio y la creación de valor sostenible a largo plazo. Definen el <em>por qué</em> y el <em>hacia dónde</em> de la PMO.' },
+  tactical:    { name:'Táctico',      icon:'⚙️', color:'#175C3A', rgb:'23,92,58',   light:'#ECFDF5', desc:'Servicios que aseguran la capacidad operativa de la PMO: metodologías, recursos, herramientas y desarrollo del equipo. Son la <em>infraestructura</em> que hace posible la ejecución.' },
+  operational: { name:'Operacional',  icon:'🔧', color:'#7C2D12', rgb:'124,45,18',  light:'#FFF7ED', desc:'Servicios de ejecución directa en proyectos y programas. Aquí se gestiona el día a día: riesgos, calidad, cambios, interesados, desempeño y entrega. Son el <em>trabajo visible</em> de la PMO.' }
+};
+
+/* ── State ── */
+let sb, services = [], lvlMap = {}, responses = {}, session = null;
+let steps = [], currentStep = 0;
+let activePeriod = null;
+// groupMap: stepId → array of service ids
+const groupMap = {};
+
+const app    = document.getElementById('app');
+const pFill  = document.getElementById('progressFill');
+const pTrack = document.getElementById('progressTrack');
+const saving = document.getElementById('savingBadge');
+
+/* ─────────────────────────────── INIT ── */
+async function init() {
+  sb = supabase.createClient(SB_URL, SB_KEY);
+
+  // ── Period validation ──────────────────────────────────
+  const token = new URLSearchParams(window.location.search).get('period');
+  if (token) {
+    const { data } = await sb
+      .from('pmo_periods')
+      .select('*')
+      .eq('token', token)
+      .eq('type', 'services')
+      .maybeSingle();
+
+    if (!data) {
+      app.innerHTML = `<div style="text-align:center;padding:80px 24px;max-width:420px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h2 style="font-size:20px;font-weight:800;margin-bottom:10px">Enlace no válido</h2><p style="color:#78716C;line-height:1.65">Este enlace no corresponde a ninguna evaluación activa. Contacta al administrador.</p></div>`;
+      return;
+    }
+    if (data.status === 'closed') {
+      app.innerHTML = `<div style="text-align:center;padding:80px 24px;max-width:420px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h2 style="font-size:20px;font-weight:800;margin-bottom:10px">Evaluación cerrada</h2><p style="color:#78716C;line-height:1.65">El período <strong>${data.name}</strong> ya fue cerrado. Ya no se aceptan nuevas evaluaciones.</p></div>`;
+      return;
+    }
+    activePeriod = data;
+    // Restrict services to scope if defined
+    if (data.services_scope?.length) {
+      // Will filter after loading catalog
+    }
+  }
+
+  const [{ data: svcs }, { data: lvls }] = await Promise.all([
+    sb.from('pmo_services_catalog').select('*').order('sort_order'),
+    sb.from('pmo_maturity_levels').select('*').order('service_id').order('level')
+  ]);
+
+  let allSvcs = svcs || [];
+  // Apply period scope filter if set
+  if (activePeriod?.services_scope?.length) {
+    allSvcs = allSvcs.filter(s => activePeriod.services_scope.includes(s.id));
+  }
+  services = allSvcs;
+
+  for (const l of (lvls || [])) {
+    if (!lvlMap[l.service_id]) lvlMap[l.service_id] = [];
+    lvlMap[l.service_id].push(l);
+  }
+
+  // Build steps dynamically based on available services
+  const strategic   = services.filter(s => s.category === 'strategic');
+  const tactical    = services.filter(s => s.category === 'tactical');
+  const operational = services.filter(s => s.category === 'operational');
+  const opA = operational.slice(0, 7);
+  const opB = operational.slice(7);
+
+  groupMap['group-strategic']   = strategic.map(s => s.id);
+  groupMap['group-tactical']    = tactical.map(s => s.id);
+  groupMap['group-operational-a'] = opA.map(s => s.id);
+  groupMap['group-operational-b'] = opB.map(s => s.id);
+
+  steps = [
+    'register',
+    'intro-strategic',   'group-strategic',
+    'intro-tactical',    'group-tactical',
+    'intro-operational', 'group-operational-a',
+                         'group-operational-b',
+    'thankyou'
+  ];
+
+  // Resume?
+  const saved = localStorage.getItem('pmo_mat_sess');
+  if (saved) {
+    try {
+      const sess = JSON.parse(saved);
+      const { data } = await sb.from('pmo_assessment_sessions').select('*').eq('id', sess.id).single();
+      if (data && data.status !== 'completed') {
+        session = { id: data.id, token: data.assessor_token };
+        const { data: rData } = await sb.from('pmo_service_assessments').select('*').eq('session_id', session.id);
+        for (const r of (rData || [])) {
+          responses[r.service_id] = { applies_status: r.applies_status, current_level: r.current_level, desired_level: r.desired_level, evidence_notes: r.evidence_notes };
+        }
+        const answered = Object.keys(responses).length;
+        if (answered >= groupMap['group-strategic'].length + groupMap['group-tactical'].length + groupMap['group-operational-a'].length) {
+          currentStep = steps.indexOf('group-operational-b');
+        } else if (answered >= groupMap['group-strategic'].length + groupMap['group-tactical'].length) {
+          currentStep = steps.indexOf('group-operational-a');
+        } else if (answered >= groupMap['group-strategic'].length) {
+          currentStep = steps.indexOf('group-tactical');
+        } else if (answered > 0) {
+          currentStep = steps.indexOf('group-strategic');
+        } else {
+          currentStep = 1;
+        }
+        render(); return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('pmo_mat_sess');
+  }
+
+  currentStep = 0;
+  render();
+}
+
+/* ─────────────────────────── RENDER ROUTER ── */
+function render() {
+  const step = steps[currentStep];
+  const cat  = getCat(step);
+  setCatVars(cat);
+  updateProgress();
+
+  if      (step === 'register')             renderRegister();
+  else if (step.startsWith('intro-'))       renderCatIntro(cat);
+  else if (step.startsWith('group-'))       renderGroup(step);
+  else if (step === 'thankyou')             renderThankyou();
+}
+
+function getCat(step) {
+  if (!step) return 'strategic';
+  if (step.includes('strategic'))   return 'strategic';
+  if (step.includes('tactical'))    return 'tactical';
+  if (step.includes('operational')) return 'operational';
+  return 'strategic';
+}
+
+function setCatVars(cat) {
+  const c = CATS[cat];
+  document.documentElement.style.setProperty('--cat',      c.color);
+  document.documentElement.style.setProperty('--cat-light',c.light);
+  document.documentElement.style.setProperty('--cat-rgb',  c.rgb);
+}
+
+function updateProgress() {
+  const allSvcIds = Object.values(groupMap).flat();
+  const answered  = allSvcIds.filter(id => responses[id]).length;
+  const pct       = allSvcIds.length ? (answered / allSvcIds.length) * 100 : 0;
+  const isContent = steps[currentStep] !== 'register' && steps[currentStep] !== 'thankyou';
+  pTrack.style.display = isContent ? 'block' : 'none';
+  pFill.style.width    = pct + '%';
+  pFill.style.background = CATS[getCat(steps[currentStep])].color;
+}
+
+/* ─────────────────────────── REGISTER ── */
+function renderRegister() {
+  const svcCount = services.length;
+  const periodBadge = activePeriod
+    ? `<div style="display:inline-flex;align-items:center;gap:6px;background:#EEF2FF;color:#1B3575;border:1px solid #C7D2FE;border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;margin-bottom:16px">📅 ${activePeriod.name}</div>`
+    : '';
+
+  app.innerHTML = `
+    <div class="card fade-up" style="margin-top:28px">
+      <p class="reg-logo">PMO Maturity Assessment</p>
+      ${periodBadge}
+      <h1 class="reg-title">Evaluación de Madurez de Servicios PMO</h1>
+      <p class="reg-sub">Evaluarás <strong>${svcCount} servicios PMO</strong> agrupados en secciones. Para cada servicio indicarás si aplica en tu PMO y los niveles de madurez <strong>actual</strong> y <strong>deseado</strong>.</p>
+      <div class="form-group">
+        <label class="form-label">Nombre completo</label>
+        <input id="fName" class="form-input" type="text" placeholder="ej. Pedro Rodríguez" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rol en la organización</label>
+        <select id="fRole" class="form-input">
+          <option value="">— Selecciona tu rol —</option>
+          <option value="PMO Director">PMO Director</option>
+          <option value="PMO Coordinator">PMO Coordinator</option>
+          <option value="Project Manager">Project Manager</option>
+          <option value="Program Manager">Program Manager</option>
+          <option value="Portfolio Manager">Portfolio Manager</option>
+          <option value="Business Analyst">Business Analyst</option>
+          <option value="Team Lead / Tech Lead">Team Lead / Tech Lead</option>
+          <option value="Executive / Sponsor">Executive / Sponsor</option>
+          <option value="Talent Acquisition and Development">Talent Acquisition &amp; Development</option>
+          <option value="Comercial / Mercadeo">Comercial / Mercadeo</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      ${activePeriod ? '' : `
+      <div class="form-group">
+        <label class="form-label">Nombre de esta evaluación</label>
+        <input id="fEval" class="form-input" type="text" placeholder="ej. Evaluación Avila Tek — Mayo 2026">
+      </div>`}
+      <button class="btn-primary" id="btnStart">Comenzar evaluación →</button>
+    </div>`;
+
+  document.getElementById('btnStart').onclick = handleRegister;
+  const enterFields = ['fName'];
+  if (!activePeriod) enterFields.push('fEval');
+  enterFields.forEach(id =>
+    document.getElementById(id).addEventListener('keydown', e => e.key === 'Enter' && handleRegister())
+  );
+}
+
+async function handleRegister() {
+  const name  = document.getElementById('fName').value.trim();
+  const role  = document.getElementById('fRole').value.trim();
+  const eval_ = activePeriod ? activePeriod.name : (document.getElementById('fEval')?.value.trim() || '');
+
+  // Validate required fields
+  const requiredIds = activePeriod ? ['fName','fRole'] : ['fName','fRole','fEval'];
+  let valid = true;
+  requiredIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el.value.trim()) { el.classList.add('error'); valid = false; }
+    else el.classList.remove('error');
+  });
+  if (!valid) return;
+
+  const btn = document.getElementById('btnStart');
+  btn.disabled = true; btn.textContent = 'Iniciando…';
+
+  const { data, error } = await sb.from('pmo_assessment_sessions').insert({
+    name: eval_, organization: ORG,
+    assessor_name: name, assessor_role: role, status: 'in_progress',
+    period_id: activePeriod?.id || null
+  }).select().single();
+
+  if (error || !data) {
+    btn.disabled = false; btn.textContent = 'Comenzar evaluación →';
+    alert('Error al crear sesión. Recarga e intenta de nuevo.'); return;
+  }
+
+  session = { id: data.id, token: data.assessor_token };
+  localStorage.setItem('pmo_mat_sess', JSON.stringify(session));
+  currentStep = 1;
+  render();
+}
+
+/* ─────────────────────────── CATEGORY INTRO ── */
+function renderCatIntro(cat) {
+  const c    = CATS[cat];
+  const step = steps[currentStep];
+
+  // Count services in this intro's groups
+  let count = 0;
+  if (cat === 'strategic')   count = groupMap['group-strategic'].length;
+  if (cat === 'tactical')    count = groupMap['group-tactical'].length;
+  if (cat === 'operational') count = groupMap['group-operational-a'].length + groupMap['group-operational-b'].length;
+
+  // Label for the "start" button
+  const nextStep = steps[currentStep + 1] || '';
+  const part = nextStep.endsWith('-b') ? '(parte 2)' : '';
+
+  app.innerHTML = `
+    <div class="cat-intro fade-up">
+      <div class="cat-orb">${c.icon}</div>
+      <div class="cat-badge-pill">${c.name}</div>
+      <h2 class="cat-heading">${c.name}</h2>
+      <p class="cat-desc">${c.desc}</p>
+      <p class="cat-count-label">${count} servicios en esta categoría</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        ${currentStep > 1 ? '<button class="btn-back" id="btnCatBack">← Anterior</button>' : ''}
+        <button class="btn-cat" id="btnCatGo">Evaluar servicios ${c.name.toLowerCase()}s →</button>
+      </div>
+    </div>`;
+
+  document.getElementById('btnCatGo').onclick = () => { currentStep++; render(); };
+  const bcb = document.getElementById('btnCatBack');
+  if (bcb) bcb.onclick = () => { currentStep--; render(); };
+}
+
+/* ─────────────────────────── GROUP SCREEN ── */
+function renderGroup(groupId) {
+  const svcIds = groupMap[groupId] || [];
+  const svcs   = svcIds.map(id => services.find(s => s.id === id)).filter(Boolean);
+  const cat    = getCat(groupId);
+  const c      = CATS[cat];
+
+  // Part label for operational
+  let partLabel = '';
+  if (groupId === 'group-operational-a') partLabel = ' · Parte 1 / 2';
+  if (groupId === 'group-operational-b') partLabel = ' · Parte 2 / 2';
+
+  const doneCount = svcs.filter(s => responses[s.id]?.applies_status).length;
+  const allDone   = doneCount === svcs.length;
+
+  app.innerHTML = `
+    <div class="card fade-up">
+      <div class="group-hd">
+        <span class="group-badge">${c.icon} ${c.name}${partLabel}</span>
+        <span class="group-prog"><span id="doneCount">${doneCount}</span> / ${svcs.length} completados</span>
+      </div>
+
+      <div class="accordion" id="accordion">
+        ${svcs.map(svc => renderAccItem(svc, cat)).join('')}
+      </div>
+
+      <div class="nav-row">
+        ${currentStep > 1 ? '<button class="btn-back" id="btnBack">← Anterior</button>' : ''}
+        <button class="btn-next" id="btnNext" ${allDone ? '' : 'disabled'}>
+          ${allDone
+            ? (steps[currentStep + 1] === 'thankyou' ? 'Finalizar evaluación ✓' : 'Siguiente →')
+            : `Completa ${svcs.length - doneCount} servicio${svcs.length - doneCount > 1 ? 's' : ''} restante${svcs.length - doneCount > 1 ? 's' : ''}`}
+        </button>
+      </div>
+    </div>`;
+
+  // Wire up accordion items
+  svcs.forEach(svc => wireAccItem(svc, groupId, svcs));
+
+  // Back
+  const bb = document.getElementById('btnBack');
+  if (bb) bb.onclick = () => { currentStep--; render(); };
+
+  // Next
+  document.getElementById('btnNext').onclick = async () => {
+    const allSvcs = (groupMap[groupId] || []).map(id => services.find(s => s.id === id)).filter(Boolean);
+    if (!allSvcs.every(s => responses[s.id]?.applies_status)) return;
+    currentStep++;
+    if (steps[currentStep] === 'thankyou') await completeSession();
+    render();
+  };
+}
+
+/* ── Build accordion item HTML ── */
+function renderAccItem(svc, cat) {
+  const resp  = responses[svc.id] || {};
+  const done  = !!resp.applies_status;
+  const lvls  = lvlMap[svc.id] || [];
+  const c     = CATS[cat];
+
+  let resultText = '';
+  if (done) {
+    if (resp.applies_status === 'no') resultText = 'No aplica';
+    else if (resp.applies_status === 'aspirational') resultText = `Aspiracional · Deseado: ${resp.desired_level || '—'}`;
+    else resultText = `Actual: ${resp.current_level || '—'} → Deseado: ${resp.desired_level || '—'}`;
+  }
+
+  const showLvl   = resp.applies_status === 'yes' || resp.applies_status === 'aspirational';
+  const curSel    = resp.current_level  || null;
+  const desSel    = resp.desired_level  || null;
+  const needCur   = resp.applies_status === 'yes';
+
+  const mkPills = (type, selected) => (lvls.map(l => `
+    <div class="lvl-pill ${selected === l.level ? 'sel' : ''}"
+         data-level="${l.level}" data-type="${type}" data-svcid="${svc.id}">
+      <span class="lvl-num">${l.level}</span>
+      <span class="lvl-tag">${l.title_es}</span>
+    </div>`).join(''));
+
+  const gapHtml = (() => {
+    if (!curSel || !desSel) return '';
+    const g = desSel - curSel;
+    const cls = g > 0 ? 'pos' : g < 0 ? 'neg' : 'neu';
+    const txt = g > 0 ? `📈 Brecha de ${g} nivel${g > 1 ? 'es' : ''}` : g < 0 ? `📉 Nivel deseado menor al actual` : `✓ En punto óptimo`;
+    return `<div class="gap-chip ${cls}" id="gap-${svc.id}">${txt}</div>`;
+  })();
+
+  return `
+    <div class="acc-item ${done ? 'done' : ''}" id="acc-${svc.id}">
+      <div class="acc-header" data-toggle="${svc.id}">
+        <span class="acc-status">${done ? '✅' : '○'}</span>
+        <div class="acc-info">
+          <span class="acc-name">${svc.name_es}</span>
+          <span class="acc-result">${resultText}</span>
+        </div>
+        <span class="acc-chevron">▾</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-inner">
+          <p class="acc-svc-desc">${svc.short_description_es}</p>
+
+          <div class="applies-row">
+            <button class="ap-btn ${resp.applies_status === 'yes'          ? 'sel' : ''}" data-val="yes"          data-svcid="${svc.id}">
+              <span class="ap-icon">✅</span><span class="ap-label">Sí aplica</span><span class="ap-hint">Activo o en desarrollo</span>
+            </button>
+            <button class="ap-btn ${resp.applies_status === 'no'           ? 'sel' : ''}" data-val="no"           data-svcid="${svc.id}">
+              <span class="ap-icon">⬜</span><span class="ap-label">No aplica</span><span class="ap-hint">Fuera de alcance</span>
+            </button>
+            <button class="ap-btn ${resp.applies_status === 'aspirational' ? 'sel' : ''}" data-val="aspirational" data-svcid="${svc.id}">
+              <span class="ap-icon">🎯</span><span class="ap-label">Aspiracional</span><span class="ap-hint">Quiero implementarlo</span>
+            </button>
+          </div>
+
+          <div id="lvlsec-${svc.id}" style="display:${showLvl ? 'block' : 'none'}">
+            <div class="levels-block">
+              <div class="lvl-header">
+                <span class="lvl-label">Nivel Actual</span>
+                <span id="curreq-${svc.id}" class="${needCur ? 'lvl-req' : 'lvl-opt'}">${needCur ? '* requerido' : 'opcional'}</span>
+              </div>
+              <div class="lvl-pills" id="curpills-${svc.id}">${mkPills('current', curSel)}</div>
+              <div id="curdesc-${svc.id}"></div>
+            </div>
+            <div class="levels-block">
+              <div class="lvl-header">
+                <span class="lvl-label">Nivel Deseado</span>
+                <span class="lvl-req">* requerido</span>
+              </div>
+              <div class="lvl-pills" id="despills-${svc.id}">${mkPills('desired', desSel)}</div>
+              <div id="desdesc-${svc.id}"></div>
+            </div>
+            ${gapHtml}
+            <label class="notes-label">Notas / Evidencia <span style="font-weight:300;text-transform:none;letter-spacing:0">(opcional)</span></label>
+            <textarea class="notes-area" id="notes-${svc.id}" placeholder="Estado actual, evidencias, observaciones…">${resp.evidence_notes || ''}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── Wire events for one accordion item ── */
+function wireAccItem(svc, groupId, allSvcs) {
+  const item = document.getElementById(`acc-${svc.id}`);
+  if (!item) return;
+  const lvls = lvlMap[svc.id] || [];
+
+  // Toggle open/close on header click
+  item.querySelector('.acc-header').onclick = (e) => {
+    if (e.target.closest('.ap-btn') || e.target.closest('.lvl-pill')) return;
+    item.classList.toggle('open');
+  };
+
+  // Auto-open if not done
+  if (!responses[svc.id]?.applies_status) item.classList.add('open');
+
+  // Applies buttons
+  item.querySelectorAll('.ap-btn').forEach(btn => {
+    btn.onclick = () => {
+      item.querySelectorAll('.ap-btn').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      const val = btn.dataset.val;
+
+      if (!responses[svc.id]) responses[svc.id] = {};
+      responses[svc.id].applies_status = val;
+
+      const showL = val === 'yes' || val === 'aspirational';
+      const lvlSec = document.getElementById(`lvlsec-${svc.id}`);
+      if (lvlSec) lvlSec.style.display = showL ? 'block' : 'none';
+
+      const curReq = document.getElementById(`curreq-${svc.id}`);
+      if (curReq) { curReq.className = val === 'yes' ? 'lvl-req' : 'lvl-opt'; curReq.textContent = val === 'yes' ? '* requerido' : 'opcional'; }
+
+      if (!showL) {
+        responses[svc.id].current_level = null;
+        responses[svc.id].desired_level = null;
+        // Mark done immediately for "no"
+        markDone(svc, item, allSvcs, groupId);
+        saveResp(svc.id, responses[svc.id]);
+      }
+      checkAutoComplete(svc, item, allSvcs, groupId);
+    };
+  });
+
+  // Level pills
+  item.querySelectorAll('.lvl-pill').forEach(pill => {
+    pill.onclick = () => {
+      const type  = pill.dataset.type;
+      const level = parseInt(pill.dataset.level);
+      const lvl   = lvls.find(l => l.level === level);
+      const pillsId = type === 'current' ? `curpills-${svc.id}` : `despills-${svc.id}`;
+      const descId  = type === 'current' ? `curdesc-${svc.id}`  : `desdesc-${svc.id}`;
+
+      document.querySelectorAll(`#${pillsId} .lvl-pill`).forEach(p => p.classList.remove('sel'));
+      pill.classList.add('sel');
+
+      if (!responses[svc.id]) responses[svc.id] = {};
+      if (type === 'current') responses[svc.id].current_level = level;
+      else                    responses[svc.id].desired_level = level;
+
+      // Show description as bullets
+      if (lvl) showDescPanel(descId, lvl);
+
+      // Update gap
+      updateGapChip(svc.id, responses[svc.id]);
+      checkAutoComplete(svc, item, allSvcs, groupId);
+    };
+  });
+
+  // Pre-fill description panels if levels already selected
+  if (responses[svc.id]?.current_level) {
+    const l = lvls.find(ll => ll.level === responses[svc.id].current_level);
+    if (l) showDescPanel(`curdesc-${svc.id}`, l);
+  }
+  if (responses[svc.id]?.desired_level) {
+    const l = lvls.find(ll => ll.level === responses[svc.id].desired_level);
+    if (l) showDescPanel(`desdesc-${svc.id}`, l);
+  }
+}
+
+/* ── Show level description as bullets ── */
+function showDescPanel(panelId, lvl) {
+  const el = document.getElementById(panelId);
+  if (!el) return;
+  const bullets = descToBullets(lvl.description_es);
+  el.innerHTML = `
+    <div class="lvl-desc-panel">
+      <div class="lvl-desc-title">${lvl.title_es}</div>
+      <ul class="lvl-desc-bullets">${bullets.map(b => `<li>${b}</li>`).join('')}</ul>
+    </div>`;
+}
+
+/* ── Split paragraph into max-3 bullet sentences ── */
+function descToBullets(text) {
+  if (!text) return [];
+  return text
+    .split(/\.\s+/)
+    .map(s => s.trim().replace(/\.$/, ''))
+    .filter(s => s.length > 20)
+    .slice(0, 3);
+}
+
+/* ── Update gap chip ── */
+function updateGapChip(svcId, resp) {
+  const el = document.getElementById(`gap-${svcId}`);
+  if (!el) return;
+  if (resp?.current_level && resp?.desired_level) {
+    const g   = resp.desired_level - resp.current_level;
+    const cls = g > 0 ? 'pos' : g < 0 ? 'neg' : 'neu';
+    const txt = g > 0 ? `📈 Brecha de ${g} nivel${g > 1 ? 'es' : ''}` : g < 0 ? `📉 Nivel deseado menor al actual` : `✓ En punto óptimo`;
+    el.className = `gap-chip ${cls}`;
+    el.textContent = txt;
+    el.style.display = '';
+  }
+}
+
+/* ── Check if service is auto-completable ── */
+function checkAutoComplete(svc, item, allSvcs, groupId) {
+  const resp = responses[svc.id] || {};
+  const as   = resp.applies_status;
+  if (!as) return;
+
+  let complete = false;
+  if (as === 'no')           complete = true;
+  if (as === 'aspirational') complete = !!resp.desired_level;
+  if (as === 'yes')          complete = !!(resp.current_level && resp.desired_level);
+
+  if (complete) {
+    resp.evidence_notes = document.getElementById(`notes-${svc.id}`)?.value?.trim() || null;
+    responses[svc.id] = resp;
+    markDone(svc, item, allSvcs, groupId);
+    saveResp(svc.id, resp);
+  }
+}
+
+function markDone(svc, item, allSvcs, groupId) {
+  const resp = responses[svc.id] || {};
+  item.classList.add('done');
+  item.classList.remove('open');
+
+  // Update status icon and result text
+  const statusEl = item.querySelector('.acc-status');
+  const resultEl = item.querySelector('.acc-result');
+  if (statusEl) statusEl.textContent = '✅';
+  if (resultEl) {
+    const as = resp.applies_status;
+    if (as === 'no')           resultEl.textContent = 'No aplica';
+    else if (as === 'aspirational') resultEl.textContent = `Aspiracional · Deseado: ${resp.desired_level || '—'}`;
+    else                       resultEl.textContent = `Actual: ${resp.current_level || '—'} → Deseado: ${resp.desired_level || '—'}`;
+    resultEl.style.display = 'block';
+  }
+
+  // Open next undone if exists
+  const nextUndone = allSvcs.find(s => s.id !== svc.id && !responses[s.id]?.applies_status);
+  if (nextUndone) {
+    const nextItem = document.getElementById(`acc-${nextUndone.id}`);
+    if (nextItem) nextItem.classList.add('open');
+  }
+
+  refreshGroupProgress(allSvcs, groupId);
+}
+
+function refreshGroupProgress(allSvcs, groupId) {
+  const done  = allSvcs.filter(s => responses[s.id]?.applies_status).length;
+  const total = allSvcs.length;
+  const allOk = done === total;
+  const dc = document.getElementById('doneCount');
+  if (dc) dc.textContent = done;
+
+  const btn = document.getElementById('btnNext');
+  if (btn) {
+    btn.disabled = !allOk;
+    btn.textContent = allOk
+      ? (steps[currentStep + 1] === 'thankyou' ? 'Finalizar evaluación ✓' : 'Siguiente →')
+      : `Completa ${total - done} servicio${total - done > 1 ? 's' : ''} restante${total - done > 1 ? 's' : ''}`;
+  }
+
+  updateProgress();
+}
+
+/* ─────────────────────────── THANK YOU ── */
+function renderThankyou() {
+  pTrack.style.display = 'none';
+  const all      = Object.values(responses);
+  const applies  = all.filter(r => r.applies_status === 'yes').length;
+  const aspirat  = all.filter(r => r.applies_status === 'aspirational').length;
+  const gaps     = all.filter(r => r.current_level && r.desired_level).map(r => r.desired_level - r.current_level);
+  const avgGap   = gaps.length ? (gaps.reduce((a,b) => a+b,0) / gaps.length).toFixed(1) : '—';
+
+  app.innerHTML = `
+    <div class="ty-wrap fade-up">
+      <div class="ty-check">✅</div>
+      <h2 class="ty-title">¡Evaluación completada!</h2>
+      <p class="ty-msg">
+        Gracias por completar la evaluación de madurez PMO.<br>
+        Tus respuestas han sido registradas — el equipo de la PMO generará el análisis de madurez.
+      </p>
+      <div class="ty-stats">
+        <div>
+          <div class="ty-stat-num" style="color:var(--cat)">${all.length}</div>
+          <div class="ty-stat-label">servicios evaluados</div>
+        </div>
+        <div>
+          <div class="ty-stat-num" style="color:#175C3A">${applies}</div>
+          <div class="ty-stat-label">servicios activos</div>
+        </div>
+        <div>
+          <div class="ty-stat-num" style="color:#7C2D12">${avgGap}</div>
+          <div class="ty-stat-label">brecha promedio</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ─────────────────────────── SUPABASE ── */
+async function saveResp(svcId, resp) {
+  if (!session) return;
+  saving.classList.add('show');
+  await sb.from('pmo_service_assessments').upsert({
+    session_id:     session.id,
+    service_id:     svcId,
+    applies_status: resp.applies_status,
+    current_level:  resp.current_level  || null,
+    desired_level:  resp.desired_level  || null,
+    evidence_notes: resp.evidence_notes || null
+  }, { onConflict: 'session_id,service_id' });
+  setTimeout(() => saving.classList.remove('show'), 800);
+}
+
+async function completeSession() {
+  if (!session) return;
+  await sb.from('pmo_assessment_sessions')
+    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .eq('id', session.id);
+  localStorage.removeItem('pmo_mat_sess');
+}
+
+/* ─────────────────────────── BOOT ── */
+init().catch(() => {
+  app.innerHTML = `<div style="text-align:center;padding:80px 20px;color:var(--muted)">
+    <p style="font-size:32px;margin-bottom:12px">⚠️</p>
+    <p>Error al cargar. Recarga la página.</p></div>`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — PMO Hub</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --ink:       #0f172a;
+  --ink2:      #334155;
+  --ink3:      #64748b;
+  --ink4:      #94a3b8;
+  --surface:   #ffffff;
+  --bg:        #f8fafc;
+  --border:    #e2e8f0;
+  --blue:      #2563eb;
+  --blue-d:    #1d4ed8;
+  --blue-p:    #eff6ff;
+  --blue-m:    #bfdbfe;
+  --green:     #059669;
+  --green-p:   #ecfdf5;
+  --amber:     #d97706;
+  --amber-p:   #fffbeb;
+  --red:       #dc2626;
+  --red-p:     #fef2f2;
+  --sidebar-w: 220px;
+  --r:         10px;
+  --r-sm:      7px;
+  --shadow:    0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.08);
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:14px; -webkit-font-smoothing:antialiased; }
+
+/* ── LOGIN ──────────────────────────────────────────────── */
+#login-screen {
+  display:flex; align-items:center; justify-content:center;
+  min-height:100vh; background:var(--ink);
+  padding:24px;
+}
+.login-box {
+  background:var(--surface); border-radius:16px;
+  padding:40px 36px; width:100%; max-width:380px;
+  box-shadow:0 8px 48px rgba(0,0,0,.24);
+}
+.login-logo { font-size:32px; margin-bottom:8px; }
+.login-title { font-size:22px; font-weight:800; color:var(--ink); margin-bottom:4px; }
+.login-sub   { font-size:13px; color:var(--ink3); margin-bottom:32px; }
+.lbl { display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink3); margin-bottom:6px; }
+.inp { width:100%; padding:11px 13px; border:1.5px solid var(--border); border-radius:var(--r-sm); font-size:14px; color:var(--ink); background:var(--surface); outline:none; transition:border-color .15s; }
+.inp:focus { border-color:var(--blue); }
+.fg { margin-bottom:16px; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:11px 18px; border-radius:var(--r-sm); font-size:14px; font-weight:700; cursor:pointer; border:none; transition:background .15s,opacity .15s; }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.btn-primary { background:var(--blue); color:#fff; width:100%; margin-top:4px; }
+.btn-primary:hover:not(:disabled) { background:var(--blue-d); }
+.btn-ghost { background:transparent; border:1.5px solid var(--border); color:var(--ink2); }
+.btn-ghost:hover:not(:disabled) { border-color:var(--ink3); background:var(--bg); }
+.btn-sm { padding:7px 13px; font-size:12px; }
+.btn-danger { background:var(--red); color:#fff; }
+.btn-danger:hover:not(:disabled) { opacity:.85; }
+.alert { padding:11px 13px; border-radius:var(--r-sm); font-size:13px; margin-top:12px; }
+.alert-red   { background:var(--red-p);   color:var(--red);   border:1px solid #fecaca; }
+.alert-green { background:var(--green-p); color:var(--green); border:1px solid #a7f3d0; }
+
+/* ── ADMIN SHELL ────────────────────────────────────────── */
+#admin-shell { display:none; min-height:100vh; }
+
+/* Sidebar */
+.sidebar {
+  position:fixed; top:0; left:0; bottom:0; width:var(--sidebar-w);
+  background:var(--ink); display:flex; flex-direction:column;
+  z-index:100; overflow-y:auto;
+}
+.sb-brand {
+  padding:20px 18px 16px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.sb-logo  { font-size:22px; }
+.sb-title { font-size:15px; font-weight:800; color:#fff; margin-top:4px; line-height:1; }
+.sb-sub   { font-size:10px; color:rgba(255,255,255,.35); letter-spacing:.06em; text-transform:uppercase; margin-top:3px; }
+.sb-nav   { flex:1; padding:12px 10px; }
+.sb-section { font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.25); padding:14px 8px 6px; }
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:var(--r-sm);
+  color:rgba(255,255,255,.55); font-size:13px; font-weight:600;
+  cursor:pointer; transition:all .15s; margin-bottom:2px;
+}
+.nav-item:hover { background:rgba(255,255,255,.07); color:rgba(255,255,255,.9); }
+.nav-item.active { background:var(--blue); color:#fff; }
+.nav-icon { font-size:16px; width:20px; text-align:center; }
+.sb-user {
+  padding:14px 18px; border-top:1px solid rgba(255,255,255,.07);
+  display:flex; align-items:center; gap:10px;
+}
+.sb-avatar { width:30px; height:30px; border-radius:50%; background:var(--blue); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#fff; flex-shrink:0; }
+.sb-email  { font-size:11px; color:rgba(255,255,255,.45); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.sb-logout { color:rgba(255,255,255,.3); cursor:pointer; font-size:13px; transition:color .15s; flex-shrink:0; }
+.sb-logout:hover { color:rgba(255,255,255,.8); }
+
+/* Main */
+.main { margin-left:var(--sidebar-w); padding:28px 32px 80px; }
+.page-header { margin-bottom:28px; }
+.page-title { font-size:22px; font-weight:800; color:var(--ink); }
+.page-sub   { font-size:13px; color:var(--ink3); margin-top:4px; }
+
+/* Cards */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:22px; box-shadow:var(--shadow); margin-bottom:14px; }
+.card-title { font-size:14px; font-weight:700; color:var(--ink); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+
+/* Stat row */
+.stat-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+.stat { flex:1; min-width:90px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:14px; }
+.stat-v { font-size:26px; font-weight:800; color:var(--ink); line-height:1; }
+.stat-l { font-size:11px; color:var(--ink3); margin-top:5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+
+/* Badges */
+.badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+.badge-green  { background:var(--green-p); color:var(--green); }
+.badge-amber  { background:var(--amber-p); color:var(--amber); }
+.badge-gray   { background:var(--bg);      color:var(--ink3); border:1px solid var(--border); }
+.dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+/* Period list */
+.period-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r); padding:18px 20px;
+  margin-bottom:10px; transition:box-shadow .15s;
+}
+.period-card:hover { box-shadow:var(--shadow-md); }
+.period-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.period-name { font-size:15px; font-weight:700; flex:1; }
+.period-meta { font-size:12px; color:var(--ink3); }
+.period-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.link-box {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:var(--r-sm); padding:7px 12px;
+  margin-top:12px;
+}
+.link-url { font-size:12px; color:var(--ink3); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:monospace; }
+.btn-copy { padding:5px 10px; font-size:11px; font-weight:700; background:var(--ink); color:#fff; border:none; border-radius:5px; cursor:pointer; transition:background .15s; white-space:nowrap; }
+.btn-copy:hover { background:var(--ink2); }
+.btn-copy.copied { background:var(--green); }
+
+/* Results expand */
+.period-results { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:none; }
+.period-results.open { display:block; }
+
+/* Ranking */
+.rank-list { display:flex; flex-direction:column; gap:6px; }
+.rank-item { display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--bg); border-radius:var(--r-sm); }
+.rank-pos  { font-size:11px; font-weight:800; color:var(--ink3); width:20px; flex-shrink:0; text-align:right; }
+.rank-label { flex:1; font-size:13px; color:var(--ink); }
+.rank-bar-wrap { width:120px; flex-shrink:0; }
+.rank-bar-bg  { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.rank-bar-fill { height:100%; background:var(--blue); border-radius:3px; transition:width .5s ease; }
+.rank-score { font-size:12px; font-weight:700; color:var(--ink2); width:32px; text-align:right; }
+
+/* Evaluator table */
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink3); padding:8px 10px; border-bottom:1.5px solid var(--border); }
+.tbl td { padding:10px 10px; border-bottom:1px solid var(--border); color:var(--ink); vertical-align:middle; }
+.tbl tr:last-child td { border-bottom:none; }
+.tbl tr:hover td { background:var(--bg); }
+
+/* Maturity table */
+.mat-table-wrap { overflow-x:auto; }
+.mat-hd { display:grid; grid-template-columns:1fr 60px 60px 70px; gap:8px; padding:8px 12px; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink3); border-bottom:1.5px solid var(--border); }
+.mat-row { display:grid; grid-template-columns:1fr 60px 60px 70px; gap:8px; padding:9px 12px; border-bottom:1px solid var(--border); align-items:center; }
+.mat-row:last-child { border-bottom:none; }
+.mat-row:hover { background:var(--bg); }
+.mat-name { font-size:13px; font-weight:600; color:var(--ink); }
+.mat-val  { font-size:13px; font-weight:700; text-align:center; }
+.mat-gap  { font-size:12px; font-weight:700; text-align:center; padding:3px 8px; border-radius:6px; }
+.gap-high { background:#fef2f2; color:#dc2626; }
+.gap-mid  { background:#fffbeb; color:#d97706; }
+.gap-low  { background:#f0fdf4; color:#059669; }
+.gap-zero { background:var(--bg); color:var(--ink3); }
+
+/* Services checkbox grid */
+.svc-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; max-height:300px; overflow-y:auto; padding:2px; }
+.svc-check { display:flex; align-items:flex-start; gap:8px; padding:8px 10px; border:1.5px solid var(--border); border-radius:var(--r-sm); cursor:pointer; transition:border-color .15s; }
+.svc-check:hover { border-color:var(--blue); }
+.svc-check input { margin-top:2px; cursor:pointer; accent-color:var(--blue); }
+.svc-check-label { font-size:12px; line-height:1.4; color:var(--ink2); }
+.svc-cat-label { font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+.cat-strategic  { color:#1B3575; }
+.cat-tactical   { color:#175C3A; }
+.cat-operational{ color:#7C2D12; }
+.svc-select-all { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; font-size:12px; color:var(--ink3); }
+.svc-select-all a { color:var(--blue); cursor:pointer; text-decoration:none; font-weight:700; }
+
+/* Modal */
+#modal-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(15,23,42,.55); z-index:500;
+  align-items:center; justify-content:center; padding:24px;
+}
+#modal-overlay.open { display:flex; }
+.modal-box {
+  background:var(--surface); border-radius:14px;
+  padding:28px 26px; width:100%; max-width:520px;
+  max-height:90vh; overflow-y:auto;
+  box-shadow:0 24px 80px rgba(0,0,0,.25);
+  animation:mIn .18s ease;
+}
+@keyframes mIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+.modal-title { font-size:17px; font-weight:800; color:var(--ink); margin-bottom:4px; }
+.modal-sub   { font-size:13px; color:var(--ink3); margin-bottom:22px; line-height:1.55; }
+.modal-footer { display:flex; gap:10px; margin-top:22px; }
+.modal-footer .btn { flex:1; }
+
+/* Empty state */
+.empty { text-align:center; padding:48px 24px; color:var(--ink3); }
+.empty-icon  { font-size:36px; margin-bottom:12px; }
+.empty-title { font-size:16px; font-weight:700; color:var(--ink2); margin-bottom:6px; }
+.empty-sub   { font-size:13px; }
+
+/* Toast */
+#toast {
+  position:fixed; bottom:24px; right:24px; z-index:600;
+  background:var(--ink); color:#fff; padding:11px 18px;
+  border-radius:8px; font-size:13px; font-weight:600;
+  display:none; align-items:center; gap:8px;
+  box-shadow:0 4px 16px rgba(0,0,0,.2);
+  animation:fadeUp .25s ease;
+}
+#toast.show { display:flex; }
+#toast.ok   { background:var(--green); }
+#toast.err  { background:var(--red); }
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+/* Tabs inside content */
+.tabs { display:flex; gap:4px; margin-bottom:22px; background:var(--border); padding:4px; border-radius:var(--r-sm); width:fit-content; }
+.tab { padding:7px 18px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; color:var(--ink3); transition:all .15s; }
+.tab.on { background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+
+/* Spinner */
+.spin { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:sp .7s linear infinite; }
+@keyframes sp { to { transform:rotate(360deg); } }
+.loading-wrap { display:flex; align-items:center; gap:12px; padding:24px 0; color:var(--ink3); font-size:14px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ LOGIN ═══════════════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">⚙️</div>
+    <div class="login-title">PMO Hub Admin</div>
+    <div class="login-sub">Acceso restringido — solo administradores</div>
+    <div class="fg">
+      <label class="lbl">Email</label>
+      <input id="lEmail" class="inp" type="email" placeholder="admin@empresa.com" autocomplete="email">
+    </div>
+    <div class="fg">
+      <label class="lbl">Contraseña</label>
+      <input id="lPass" class="inp" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="btnLogin">Ingresar</button>
+    <div id="loginError" class="alert alert-red" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ADMIN SHELL ═══════════════════════════ -->
+<div id="admin-shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo">⚙️</div>
+      <div class="sb-title">PMO Hub</div>
+      <div class="sb-sub">Admin Panel</div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-section">Módulos</div>
+      <div class="nav-item active" id="nav-resultados" onclick="showModule('resultados')">
+        <span class="nav-icon">🎯</span> Resultados
+      </div>
+      <div class="nav-item" id="nav-servicios" onclick="showModule('servicios')">
+        <span class="nav-icon">📊</span> Servicios
+      </div>
+      <div class="nav-item" id="nav-equipo" style="opacity:.4;cursor:not-allowed" title="Próximamente">
+        <span class="nav-icon">👥</span> Equipo
+      </div>
+    </nav>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar">A</div>
+      <div class="sb-email" id="sbEmail">—</div>
+      <span class="sb-logout" onclick="handleLogout()" title="Cerrar sesión">⏏</span>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+    <div id="content-area"></div>
+  </main>
+</div>
+
+<!-- ═══════════════════════════ MODAL ═══════════════════════════ -->
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-box" id="modal-box"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   CONFIG
+════════════════════════════════════════════════════════════ */
+const SB_URL  = 'https://yhmrxwloxwkjatxoqxhs.supabase.co';
+const SB_KEY  = 'sb_publishable_XZQk6N1xCuiSCJB10CbcHw_GkFuyJhJ';
+const BASE    = window.location.origin;
+
+const OUTCOMES = [
+  {id:1,  title:'Mayor disponibilidad de recursos cualificados'},
+  {id:2,  title:'Mejor gestión del cambio organizacional'},
+  {id:3,  title:'Mejor control sobre los equipos de proyecto'},
+  {id:4,  title:'Mejor definición de roles y responsabilidades'},
+  {id:5,  title:'Mejor priorización de proyectos'},
+  {id:6,  title:'Mejor calidad de los resultados del proyecto'},
+  {id:7,  title:'Mejor gestión del talento'},
+  {id:8,  title:'Transferencia eficaz de conocimientos'},
+  {id:9,  title:'Toma de decisiones mejorada'},
+  {id:10, title:'Mejor experiencia del cliente del proyecto'},
+  {id:11, title:'Mejor gestión de recursos'},
+  {id:12, title:'Mayor alineación con los objetivos estratégicos'},
+  {id:13, title:'Mayor integración entre áreas de la organización'},
+  {id:14, title:'Mayor retorno de la inversión (ROI)'},
+  {id:15, title:'Mayor disponibilidad de información'},
+  {id:16, title:'Mejor colaboración y comunicación'},
+  {id:17, title:'Mayor compromiso organizacional con los resultados'},
+  {id:18, title:'Mejor gestión del presupuesto del proyecto'},
+  {id:19, title:'Mejor relación con los clientes del proyecto'},
+  {id:20, title:'Mejor gestión del desempeño'},
+  {id:21, title:'Mejores tasas de éxito de proyectos'},
+  {id:22, title:'Mayor confiabilidad de la información'},
+  {id:23, title:'Mejor involucramiento de los interesados'},
+  {id:24, title:'Mayor aprendizaje organizacional'},
+  {id:25, title:'Mayor productividad en los proyectos'},
+  {id:26, title:'Mayor visibilidad del avance del proyecto'},
+  {id:27, title:'Pronóstico de proyectos más preciso'},
+  {id:28, title:'Reducción de la exposición al riesgo'},
+  {id:29, title:'Gobernanza y cumplimiento más estrictos'},
+  {id:30, title:'Reducción del ciclo de vida del proyecto'},
+];
+
+/* ════════════════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════════════════ */
+let sb, currentUser = null, activeModule = 'resultados';
+let servicesCatalog = [];
+
+/* ════════════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════════════ */
+(async function init() {
+  sb = supabase.createClient(SB_URL, SB_KEY);
+
+  // Auth state
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    currentUser = session.user;
+    await loadServicesCatalog();
+    showAdminShell();
+  }
+
+  sb.auth.onAuthStateChange((_event, session) => {
+    if (session?.user && !currentUser) {
+      currentUser = session.user;
+      loadServicesCatalog().then(showAdminShell);
+    }
+  });
+
+  // Login bindings
+  document.getElementById('btnLogin').onclick = handleLogin;
+  ['lEmail','lPass'].forEach(id =>
+    document.getElementById(id).addEventListener('keydown', e => e.key === 'Enter' && handleLogin())
+  );
+})();
+
+async function loadServicesCatalog() {
+  const { data } = await sb.from('pmo_services_catalog').select('id,name_es,category,sort_order').order('sort_order');
+  servicesCatalog = data || [];
+}
+
+/* ════════════════════════════════════════════════════════════
+   AUTH
+════════════════════════════════════════════════════════════ */
+async function handleLogin() {
+  const email = document.getElementById('lEmail').value.trim();
+  const pass  = document.getElementById('lPass').value;
+  const err   = document.getElementById('loginError');
+  const btn   = document.getElementById('btnLogin');
+  if (!email || !pass) { err.textContent = 'Ingresa email y contraseña.'; err.style.display='block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Verificando…';
+  err.style.display = 'none';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) {
+    err.textContent = 'Credenciales incorrectas. Verifica email y contraseña.';
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Ingresar';
+    return;
+  }
+  currentUser = data.user;
+  await loadServicesCatalog();
+  showAdminShell();
+}
+
+async function handleLogout() {
+  await sb.auth.signOut();
+  currentUser = null;
+  document.getElementById('admin-shell').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showAdminShell() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-shell').style.display  = 'block';
+  const email = currentUser.email || '';
+  document.getElementById('sbEmail').textContent  = email;
+  document.getElementById('sbAvatar').textContent = email[0]?.toUpperCase() || 'A';
+  showModule('resultados');
+}
+
+/* ════════════════════════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════════════════════════ */
+function showModule(name) {
+  activeModule = name;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const navEl = document.getElementById('nav-' + name);
+  if (navEl) navEl.classList.add('active');
+  if      (name === 'resultados') renderResultados();
+  else if (name === 'servicios')  renderServicios();
+}
+
+/* ════════════════════════════════════════════════════════════
+   MODULE: RESULTADOS
+════════════════════════════════════════════════════════════ */
+async function renderResultados() {
+  const ca = document.getElementById('content-area');
+  ca.innerHTML = `
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div class="page-title">🎯 Resultados Esperados</div>
+          <div class="page-sub">Evaluaciones de prioridades por período</div>
+        </div>
+        <button class="btn btn-primary" onclick="openCreatePeriod('results')">＋ Nueva evaluación</button>
+      </div>
+    </div>
+    <div id="result-periods-list"><div class="loading-wrap"><div class="spin"></div> Cargando períodos…</div></div>`;
+  await loadResultPeriods();
+}
+
+async function loadResultPeriods() {
+  const { data: periods } = await sb
+    .from('pmo_periods')
+    .select('*')
+    .eq('type', 'results')
+    .order('created_at', { ascending: false });
+
+  const container = document.getElementById('result-periods-list');
+  if (!periods?.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">🎯</div><div class="empty-title">Sin evaluaciones aún</div><div class="empty-sub">Crea el primer período para generar un enlace y comenzar a recopilar datos.</div></div>`;
+    return;
+  }
+
+  // Get response counts per period
+  const periodIds = periods.map(p => p.id);
+  const { data: respCounts } = await sb
+    .from('pmo_responses')
+    .select('period_id')
+    .in('period_id', periodIds);
+
+  const counts = {};
+  (respCounts || []).forEach(r => { counts[r.period_id] = (counts[r.period_id] || 0) + 1; });
+
+  container.innerHTML = periods.map(p => {
+    const count   = counts[p.id] || 0;
+    const link    = `${BASE}/?period=${p.token}`;
+    const isActive = p.status === 'active';
+    return `
+    <div class="period-card" id="pc-${p.id}">
+      <div class="period-row">
+        <div>
+          <div class="period-name">${p.name}</div>
+          <div class="period-meta">${fmtDate(p.created_at)}${p.closes_at ? ' · Cierra ' + fmtDate(p.closes_at) : ''}</div>
+        </div>
+        <span class="badge ${isActive ? 'badge-green' : 'badge-gray'}"><span class="dot"></span>${isActive ? 'Activo' : 'Cerrado'}</span>
+        <div class="period-actions">
+          <span style="font-size:13px;font-weight:700;color:var(--ink3)">${count} respuesta${count !== 1 ? 's' : ''}</span>
+          ${count > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleResultsView('${p.id}')">Ver resultados</button>` : ''}
+          ${isActive ? `<button class="btn btn-danger btn-sm" onclick="closePeriod('${p.id}','results')">Cerrar</button>` : ''}
+        </div>
+      </div>
+      <div class="link-box">
+        <span class="link-url">${link}</span>
+        <button class="btn-copy" id="copy-${p.id}" onclick="copyLink('${link}','copy-${p.id}')">Copiar</button>
+      </div>
+      <div class="period-results" id="res-${p.id}"></div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleResultsView(periodId) {
+  const el = document.getElementById('res-' + periodId);
+  if (el.classList.contains('open')) { el.classList.remove('open'); return; }
+  el.classList.add('open');
+  el.innerHTML = `<div class="loading-wrap"><div class="spin"></div> Cargando resultados…</div>`;
+  await loadResultAnalytics(periodId, el);
+}
+
+async function loadResultAnalytics(periodId, container) {
+  const { data: responses } = await sb
+    .from('pmo_responses')
+    .select('*')
+    .eq('period_id', periodId)
+    .order('created_at', { ascending: false });
+
+  if (!responses?.length) {
+    container.innerHTML = '<p style="font-size:13px;color:var(--ink3);padding:8px 0">Sin respuestas aún.</p>';
+    return;
+  }
+
+  // Score: P1=5pts P2=4 P3=3 P4=2 P5=1
+  const scores = {};
+  const weights = [5, 4, 3, 2, 1];
+  for (const r of responses) {
+    [1,2,3,4,5].forEach((n, i) => {
+      const id = r[`priority_${n}`];
+      if (id) scores[id] = (scores[id] || 0) + weights[i];
+    });
+  }
+
+  const ranked = OUTCOMES
+    .map(o => ({ ...o, score: scores[o.id] || 0 }))
+    .filter(o => o.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const maxScore = ranked[0]?.score || 1;
+
+  // Group breakdown
+  const groupCounts = {};
+  for (const r of responses) {
+    const g = r.customer_group || 'Sin especificar';
+    groupCounts[g] = (groupCounts[g] || 0) + 1;
+  }
+
+  container.innerHTML = `
+    <div class="stat-row" style="margin-top:14px">
+      <div class="stat"><div class="stat-v">${responses.length}</div><div class="stat-l">Respuestas</div></div>
+      <div class="stat"><div class="stat-v">${Object.keys(groupCounts).length}</div><div class="stat-l">Roles</div></div>
+      <div class="stat"><div class="stat-v">${ranked.length}</div><div class="stat-l">Outcomes votados</div></div>
+    </div>
+    <div class="card-title" style="margin-bottom:12px">Ranking de prioridades</div>
+    <div class="rank-list">
+      ${ranked.slice(0, 15).map((o, i) => `
+        <div class="rank-item">
+          <div class="rank-pos">#${i+1}</div>
+          <div class="rank-label">${o.title}</div>
+          <div class="rank-bar-wrap">
+            <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${Math.round(o.score/maxScore*100)}%"></div></div>
+          </div>
+          <div class="rank-score">${o.score}</div>
+        </div>`).join('')}
+    </div>
+    <div class="card-title" style="margin-top:20px;margin-bottom:10px">Respuestas por rol</div>
+    <table class="tbl">
+      <thead><tr><th>Rol</th><th>Respuestas</th></tr></thead>
+      <tbody>${Object.entries(groupCounts).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`<tr><td>${g}</td><td><strong>${c}</strong></td></tr>`).join('')}</tbody>
+    </table>`;
+}
+
+/* ════════════════════════════════════════════════════════════
+   MODULE: SERVICIOS
+════════════════════════════════════════════════════════════ */
+async function renderServicios() {
+  const ca = document.getElementById('content-area');
+  ca.innerHTML = `
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div class="page-title">📊 Madurez de Servicios PMO</div>
+          <div class="page-sub">Evaluaciones de madurez por período</div>
+        </div>
+        <button class="btn btn-primary" onclick="openCreatePeriod('services')">＋ Nueva evaluación</button>
+      </div>
+    </div>
+    <div id="services-periods-list"><div class="loading-wrap"><div class="spin"></div> Cargando períodos…</div></div>`;
+  await loadServicePeriods();
+}
+
+async function loadServicePeriods() {
+  const { data: periods } = await sb
+    .from('pmo_periods')
+    .select('*')
+    .eq('type', 'services')
+    .order('created_at', { ascending: false });
+
+  const container = document.getElementById('services-periods-list');
+  if (!periods?.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">Sin evaluaciones aún</div><div class="empty-sub">Crea el primer período para seleccionar servicios y generar el enlace para evaluadores.</div></div>`;
+    return;
+  }
+
+  const periodIds = periods.map(p => p.id);
+  const { data: sessData } = await sb
+    .from('pmo_assessment_sessions')
+    .select('period_id, status')
+    .in('period_id', periodIds);
+
+  const sessCounts = {};
+  (sessData || []).forEach(s => { sessCounts[s.period_id] = (sessCounts[s.period_id] || 0) + 1; });
+
+  container.innerHTML = periods.map(p => {
+    const count   = sessCounts[p.id] || 0;
+    const link    = `${BASE}/service-assessment.html?period=${p.token}`;
+    const isActive = p.status === 'active';
+    const scope   = p.services_scope ? `${p.services_scope.length} servicios seleccionados` : '26 servicios (todos)';
+    return `
+    <div class="period-card" id="sp-${p.id}">
+      <div class="period-row">
+        <div>
+          <div class="period-name">${p.name}</div>
+          <div class="period-meta">${fmtDate(p.created_at)} · ${scope}${p.closes_at ? ' · Cierra ' + fmtDate(p.closes_at) : ''}</div>
+        </div>
+        <span class="badge ${isActive ? 'badge-green' : 'badge-gray'}"><span class="dot"></span>${isActive ? 'Activo' : 'Cerrado'}</span>
+        <div class="period-actions">
+          <span style="font-size:13px;font-weight:700;color:var(--ink3)">${count} evaluador${count !== 1 ? 'es' : ''}</span>
+          ${count > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleServiceResults('${p.id}')">Ver resultados</button>` : ''}
+          ${isActive ? `<button class="btn btn-danger btn-sm" onclick="closePeriod('${p.id}','services')">Cerrar</button>` : ''}
+        </div>
+      </div>
+      <div class="link-box">
+        <span class="link-url">${link}</span>
+        <button class="btn-copy" id="copy-${p.id}" onclick="copyLink('${link}','copy-${p.id}')">Copiar</button>
+      </div>
+      <div class="period-results" id="sres-${p.id}"></div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleServiceResults(periodId) {
+  const el = document.getElementById('sres-' + periodId);
+  if (el.classList.contains('open')) { el.classList.remove('open'); return; }
+  el.classList.add('open');
+  el.innerHTML = `<div class="loading-wrap"><div class="spin"></div> Cargando resultados…</div>`;
+  await loadServiceAnalytics(periodId, el);
+}
+
+async function loadServiceAnalytics(periodId, container) {
+  // Get sessions for this period
+  const { data: sessions } = await sb
+    .from('pmo_assessment_sessions')
+    .select('*')
+    .eq('period_id', periodId)
+    .order('created_at', { ascending: false });
+
+  if (!sessions?.length) {
+    container.innerHTML = '<p style="font-size:13px;color:var(--ink3);padding:8px 0">Sin evaluadores aún.</p>';
+    return;
+  }
+
+  const sessionIds = sessions.map(s => s.id);
+  const { data: assessments } = await sb
+    .from('pmo_service_assessments')
+    .select('*')
+    .in('session_id', sessionIds);
+
+  // Aggregate per service
+  const svcData = {}; // service_id → { currentLevels[], desiredLevels[], gaps[], count }
+  for (const a of (assessments || [])) {
+    if (a.applies_status === 'no') continue;
+    if (!svcData[a.service_id]) svcData[a.service_id] = { current:[], desired:[], gaps:[] };
+    if (a.current_level  != null) svcData[a.service_id].current.push(a.current_level);
+    if (a.desired_level  != null) svcData[a.service_id].desired.push(a.desired_level);
+    if (a.gap            != null) svcData[a.service_id].gaps.push(a.gap);
+  }
+
+  const avg = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : '—';
+
+  // Get the period to know scope
+  const { data: period } = await sb.from('pmo_periods').select('services_scope').eq('id', periodId).single();
+  const scopeIds = period?.services_scope || null;
+  const displaySvcs = scopeIds
+    ? servicesCatalog.filter(s => scopeIds.includes(s.id))
+    : servicesCatalog;
+
+  // Sort by avg gap desc
+  const rows = displaySvcs.map(s => ({
+    ...s,
+    avgCurrent: avg(svcData[s.id]?.current || []),
+    avgDesired: avg(svcData[s.id]?.desired || []),
+    avgGap:     svcData[s.id]?.gaps?.length ? parseFloat(avg(svcData[s.id].gaps)) : null,
+  })).sort((a, b) => (b.avgGap ?? -99) - (a.avgGap ?? -99));
+
+  const completedCount = sessions.filter(s => s.status === 'completed').length;
+
+  container.innerHTML = `
+    <div class="stat-row" style="margin-top:14px">
+      <div class="stat"><div class="stat-v">${sessions.length}</div><div class="stat-l">Evaluadores</div></div>
+      <div class="stat"><div class="stat-v">${completedCount}</div><div class="stat-l">Completados</div></div>
+      <div class="stat"><div class="stat-v">${sessions.length - completedCount}</div><div class="stat-l">En progreso</div></div>
+    </div>
+
+    <div class="card-title" style="margin-bottom:8px">Evaluadores</div>
+    <table class="tbl" style="margin-bottom:20px">
+      <thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <tbody>${sessions.map(s => `
+        <tr>
+          <td><strong>${s.assessor_name || '—'}</strong></td>
+          <td>${s.assessor_role || '—'}</td>
+          <td><span class="badge ${s.status==='completed'?'badge-green':s.status==='in_progress'?'badge-amber':'badge-gray'}">${fmtStatus(s.status)}</span></td>
+          <td>${fmtDate(s.created_at)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <div class="card-title" style="margin-bottom:8px">Madurez por servicio <span style="font-size:12px;font-weight:500;color:var(--ink3)">(promedio entre evaluadores · ordenado por brecha)</span></div>
+    <div class="mat-table-wrap">
+      <div class="mat-hd"><span>Servicio</span><span style="text-align:center">Actual</span><span style="text-align:center">Deseado</span><span style="text-align:center">Brecha</span></div>
+      ${rows.map(r => {
+        const gapVal = r.avgGap;
+        const gapClass = gapVal === null ? 'gap-zero' : gapVal >= 3 ? 'gap-high' : gapVal >= 2 ? 'gap-mid' : gapVal >= 1 ? 'gap-low' : 'gap-zero';
+        return `<div class="mat-row">
+          <div>
+            <div class="mat-name">${r.name_es}</div>
+            <div class="svc-cat-label cat-${r.category}">${r.category}</div>
+          </div>
+          <div class="mat-val">${r.avgCurrent}</div>
+          <div class="mat-val">${r.avgDesired}</div>
+          <div><span class="mat-gap ${gapClass}">${gapVal !== null ? (gapVal > 0 ? '+' : '') + gapVal : '—'}</span></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+/* ════════════════════════════════════════════════════════════
+   CREATE PERIOD MODAL
+════════════════════════════════════════════════════════════ */
+function openCreatePeriod(type) {
+  const isServices = type === 'services';
+  const svcGrid = isServices ? buildServiceGrid() : '';
+
+  showModal(`
+    <div class="modal-title">Nueva evaluación de ${isServices ? 'madurez' : 'resultados'}</div>
+    <div class="modal-sub">Se generará un enlace que puedes compartir con el equipo.</div>
+    <div class="fg">
+      <label class="lbl">Nombre del período</label>
+      <input id="mName" class="inp" type="text" placeholder="ej. Q1 2026, Enero 2026…" autofocus>
+    </div>
+    <div class="fg">
+      <label class="lbl">Fecha de cierre (opcional)</label>
+      <input id="mCloses" class="inp" type="date">
+    </div>
+    ${isServices ? `
+    <div class="fg">
+      <label class="lbl">Servicios a evaluar</label>
+      <div class="svc-select-all">
+        <span id="svcCount">26 seleccionados</span>
+        <div style="display:flex;gap:12px">
+          <a onclick="setAllSvc(true)">Seleccionar todos</a>
+          <a onclick="setAllSvc(false)">Deseleccionar todos</a>
+        </div>
+      </div>
+      <div class="svc-grid">${svcGrid}</div>
+    </div>` : ''}
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="createPeriod('${type}')">Crear y obtener enlace</button>
+    </div>`);
+
+  if (isServices) updateSvcCount();
+}
+
+function buildServiceGrid() {
+  return servicesCatalog.map(s => `
+    <label class="svc-check">
+      <input type="checkbox" class="svc-cb" value="${s.id}" checked onchange="updateSvcCount()">
+      <div>
+        <div class="svc-check-label">${s.name_es}</div>
+        <div class="svc-cat-label cat-${s.category}">${s.category}</div>
+      </div>
+    </label>`).join('');
+}
+
+function updateSvcCount() {
+  const checked = document.querySelectorAll('.svc-cb:checked').length;
+  const el = document.getElementById('svcCount');
+  if (el) el.textContent = `${checked} seleccionado${checked !== 1 ? 's' : ''}`;
+}
+
+function setAllSvc(val) {
+  document.querySelectorAll('.svc-cb').forEach(cb => { cb.checked = val; });
+  updateSvcCount();
+}
+
+async function createPeriod(type) {
+  const name = document.getElementById('mName')?.value.trim();
+  if (!name) { document.getElementById('mName').focus(); return; }
+
+  const closesAt  = document.getElementById('mCloses')?.value || null;
+  const isServices = type === 'services';
+
+  let servicesScope = null;
+  if (isServices) {
+    const checked = [...document.querySelectorAll('.svc-cb:checked')].map(cb => parseInt(cb.value));
+    if (checked.length === 0) { showToast('Selecciona al menos un servicio', 'err'); return; }
+    if (checked.length < servicesCatalog.length) servicesScope = checked;
+  }
+
+  const payload = {
+    name, type,
+    created_by: currentUser.id,
+    ...(closesAt ? { closes_at: closesAt } : {}),
+    ...(servicesScope ? { services_scope: servicesScope } : {}),
+  };
+
+  const { data, error } = await sb.from('pmo_periods').insert(payload).select().single();
+  if (error) { showToast('Error al crear el período', 'err'); return; }
+
+  closeModal();
+  showToast('Período creado ✓', 'ok');
+
+  // Reload the active module list
+  if (type === 'results') await loadResultPeriods();
+  else await loadServicePeriods();
+}
+
+/* ════════════════════════════════════════════════════════════
+   CLOSE PERIOD
+════════════════════════════════════════════════════════════ */
+async function closePeriod(periodId, type) {
+  if (!confirm('¿Cerrar este período? Ya no podrán enviarse nuevas respuestas.')) return;
+  const { error } = await sb.from('pmo_periods').update({ status: 'closed' }).eq('id', periodId);
+  if (error) { showToast('Error al cerrar el período', 'err'); return; }
+  showToast('Período cerrado', 'ok');
+  if (type === 'results') await loadResultPeriods();
+  else await loadServicePeriods();
+}
+
+/* ════════════════════════════════════════════════════════════
+   UTILS
+════════════════════════════════════════════════════════════ */
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('es-VE', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function fmtStatus(s) {
+  return s === 'completed' ? 'Completado' : s === 'in_progress' ? 'En progreso' : 'Pendiente';
+}
+
+function copyLink(url, btnId) {
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById(btnId);
+    if (btn) { btn.textContent = '✓ Copiado'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 2000); }
+  });
+}
+
+/* ── Modal ── */
+function showModal(html) {
+  document.getElementById('modal-box').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+/* ── Toast ── */
+let toastTimer;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', 3000);
+}
+</script>
+</body>
+</html>

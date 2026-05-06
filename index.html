@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evaluación de Prioridades — La PMO</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Crect x='7' y='18' width='4' height='8' rx='1.5' fill='white'/%3E%3Crect x='14' y='12' width='4' height='14' rx='1.5' fill='white'/%3E%3Crect x='21' y='6' width='4' height='20' rx='1.5' fill='white'/%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --ink:        #0f172a;
+  --ink-2:      #334155;
+  --ink-3:      #64748b;
+  --ink-4:      #94a3b8;
+  --surface:    #ffffff;
+  --bg:         #f8fafc;
+  --border:     #e2e8f0;
+  --border-2:   #cbd5e1;
+  --blue:       #2563eb;
+  --blue-dark:  #1d4ed8;
+  --blue-pale:  #eff6ff;
+  --blue-mid:   #bfdbfe;
+  --green:      #059669;
+  --green-pale: #ecfdf5;
+  --amber:      #d97706;
+  --amber-pale: #fffbeb;
+  --red:        #dc2626;
+  --red-pale:   #fef2f2;
+  --r:          12px;
+  --r-sm:       8px;
+  --shadow:     0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.07);
+}
+
+/* ── RESET ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  line-height: 1.55;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── PAGES ──────────────────────────────────────────────── */
+.page { display: none; }
+.page.on { display: block; }
+.wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 140px; }
+
+/* ── STICKY HEADER ──────────────────────────────────────── */
+.hdr {
+  position: sticky; top: 0; z-index: 300;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+}
+.hdr-in {
+  max-width: 680px; margin: 0 auto;
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.hdr-brand { display: flex; align-items: center; gap: 10px; }
+.hdr-pill {
+  background: var(--blue); color: #fff;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 5px;
+}
+.hdr-name { font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.hdr-step { font-size: 12px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
+
+/* ── PROGRESS ───────────────────────────────────────────── */
+.prog {
+  height: 2px; background: var(--border); overflow: hidden;
+}
+.prog-bar {
+  height: 100%; background: var(--blue);
+  transition: width .4s cubic-bezier(.4,0,.2,1);
+}
+
+/* ── TYPOGRAPHY ─────────────────────────────────────────── */
+h1 { font-size: 26px; font-weight: 800; line-height: 1.2; letter-spacing: -.02em; }
+h2 { font-size: 19px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }
+h3 { font-size: 14px; font-weight: 700; color: var(--ink-2); }
+.lead { font-size: 15px; color: var(--ink-3); line-height: 1.65; }
+.caption { font-size: 12px; color: var(--ink-4); }
+
+/* ── CARDS ──────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 12px; }
+.card-sm { padding: 16px 20px; }
+
+/* ── BUTTONS ────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 20px; border-radius: var(--r-sm);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  border: none; transition: all .15s; text-decoration: none; line-height: 1;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: var(--blue-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,.25); }
+.btn-primary:disabled { background: var(--ink-4); cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-ghost { background: var(--surface); color: var(--ink-2); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--bg); border-color: var(--border-2); }
+.btn-success { background: var(--green); color: #fff; }
+.btn-success:hover { background: #047857; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(5,150,105,.25); }
+.btn-lg { padding: 13px 28px; font-size: 15px; border-radius: var(--r); }
+.btn-block { width: 100%; display: flex; }
+.btn-block + .btn-block { margin-top: 8px; }
+
+/* ── FORMS ──────────────────────────────────────────────── */
+.fg { margin-bottom: 20px; }
+.fg:last-child { margin-bottom: 0; }
+.lbl { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+.inp {
+  width: 100%; padding: 11px 14px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  font-size: 14px; color: var(--ink); background: var(--surface);
+  outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.inp:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.sel {
+  width: 100%; padding: 11px 38px 11px 14px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  font-size: 14px; color: var(--ink); background: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 18px;
+  appearance: none; outline: none; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.sel:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+
+/* ── ALERTS ─────────────────────────────────────────────── */
+.alert { padding: 12px 16px; border-radius: var(--r-sm); font-size: 13px; border: 1px solid; line-height: 1.55; }
+.alert-blue { background: var(--blue-pale); border-color: var(--blue-mid); color: #1e40af; }
+.alert-green { background: var(--green-pale); border-color: #a7f3d0; color: #065f46; }
+.alert-amber { background: var(--amber-pale); border-color: #fde68a; color: #92400e; }
+.alert-red { background: var(--red-pale); border-color: #fecaca; color: #991b1b; }
+
+/* ── LANDING HERO ────────────────────────────────────────── */
+.hero {
+  background: linear-gradient(135deg, var(--blue) 0%, #1d4ed8 100%);
+  border-radius: var(--r);
+  padding: 40px 32px;
+  color: #fff;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='28'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+  pointer-events: none;
+}
+.hero-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(255,255,255,.7); margin-bottom: 10px;
+}
+.hero h1 { color: #fff; margin-bottom: 12px; font-size: 28px; }
+.hero .lead { color: rgba(255,255,255,.85); font-size: 15px; }
+
+/* ── INSTRUCTION STEPS ───────────────────────────────────── */
+.steps { list-style: none; padding: 0; margin: 0; }
+.steps li {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 14px 0; border-bottom: 1px solid var(--border);
+}
+.steps li:last-child { border-bottom: none; padding-bottom: 0; }
+.step-n {
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: var(--blue); color: #fff;
+  border-radius: 50%; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 1px;
+}
+.step-body {}
+.step-body strong { font-size: 14px; font-weight: 700; color: var(--ink); display: block; margin-bottom: 3px; }
+.step-body p { font-size: 13px; color: var(--ink-3); line-height: 1.55; }
+
+/* ── OUTCOME ITEM ─────────────────────────────────────────── */
+.oc {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: border-color .18s, background .18s, box-shadow .18s;
+  position: relative;
+  margin-bottom: 8px;
+  user-select: none;
+}
+.oc:hover { border-color: var(--blue-mid); background: var(--blue-pale); box-shadow: var(--shadow-md); }
+.oc.selected { border-color: var(--blue); background: var(--blue-pale); box-shadow: 0 0 0 1px var(--blue); }
+.oc.disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+
+.oc-left { flex-shrink: 0; }
+.oc-num {
+  width: 32px; height: 32px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 12px; font-weight: 700; color: var(--ink-3);
+  display: flex; align-items: center; justify-content: center;
+}
+.oc.selected .oc-num {
+  background: var(--blue); border-color: var(--blue); color: #fff;
+  font-size: 14px;
+}
+.oc-body { flex: 1; min-width: 0; }
+.oc-title { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.35; margin-bottom: 5px; }
+.oc-signal {
+  font-size: 12px; color: var(--ink-3); line-height: 1.5;
+}
+.oc-signal strong { color: var(--ink-4); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.oc-check {
+  position: absolute; top: 14px; right: 14px;
+  width: 20px; height: 20px;
+  background: var(--blue); border-radius: 50%;
+  display: none; align-items: center; justify-content: center;
+}
+.oc-check::after { content: '✓'; font-size: 11px; color: #fff; font-weight: 700; }
+.oc.selected .oc-check { display: flex; }
+
+/* ── STICKY TRAY ─────────────────────────────────────────── */
+.tray {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 24px rgba(0,0,0,.07);
+  z-index: 200; padding: 10px 16px 14px;
+}
+.tray-in { max-width: 680px; margin: 0 auto; }
+.tray-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.tray-label { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .07em; }
+.tray-counter { font-size: 12px; font-weight: 700; color: var(--blue); }
+.tray-slots { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.tray-slots::-webkit-scrollbar { display: none; }
+.tray-slot {
+  flex-shrink: 0;
+  min-width: 110px; max-width: 160px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1.5px dashed var(--border-2);
+  background: var(--bg);
+  display: flex; align-items: center; gap: 7px;
+  transition: all .15s;
+}
+.tray-slot.filled { border-style: solid; border-color: var(--blue-mid); background: var(--blue-pale); }
+.tray-slot-n {
+  width: 20px; height: 20px; flex-shrink: 0;
+  border-radius: 50%; background: var(--border);
+  font-size: 11px; font-weight: 700; color: var(--ink-3);
+  display: flex; align-items: center; justify-content: center;
+}
+.tray-slot.filled .tray-slot-n { background: var(--blue); color: #fff; }
+.tray-slot-txt { font-size: 11px; font-weight: 600; color: var(--ink-3); line-height: 1.2; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tray-slot.filled .tray-slot-txt { color: #1e40af; }
+.tray-slot-rm { font-size: 13px; color: var(--ink-4); cursor: pointer; flex-shrink: 0; line-height: 1; }
+.tray-slot-rm:hover { color: var(--red); }
+.tray-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; }
+
+/* ── SIMPLE NAV FOOTER ───────────────────────────────────── */
+.nav-foot {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 12px 16px 16px; z-index: 200;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.nav-foot-in { max-width: 680px; margin: 0 auto; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+
+/* ── REVIEW LIST ─────────────────────────────────────────── */
+.rv-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); margin-bottom: 8px;
+  box-shadow: var(--shadow);
+}
+.rv-rank {
+  width: 34px; height: 34px; flex-shrink: 0;
+  background: var(--blue); color: #fff; border-radius: 50%;
+  font-size: 15px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.rv-title { font-size: 13px; font-weight: 700; flex: 1; line-height: 1.35; }
+.rv-controls { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.rv-controls button {
+  width: 26px; height: 24px; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--bg);
+  cursor: pointer; font-size: 10px; color: var(--ink-3);
+  display: flex; align-items: center; justify-content: center; transition: all .12s;
+}
+.rv-controls button:hover { background: var(--blue-pale); border-color: var(--blue-mid); color: var(--blue); }
+.rv-controls button:disabled { opacity: .25; cursor: not-allowed; }
+.rv-rm { color: var(--ink-4); cursor: pointer; font-size: 16px; margin-left: 4px; line-height: 1; flex-shrink: 0; }
+.rv-rm:hover { color: var(--red); }
+
+/* ── DONE SCREEN ─────────────────────────────────────────── */
+.done-hero {
+  text-align: center;
+  padding: 40px 24px 32px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.done-icon {
+  width: 72px; height: 72px;
+  background: var(--green-pale); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; margin: 0 auto 20px;
+  border: 2px solid #a7f3d0;
+}
+.done-hero h1 { font-size: 24px; margin-bottom: 8px; }
+.done-hero .lead { max-width: 400px; margin: 0 auto; }
+
+.priority-list { list-style: none; padding: 0; }
+.priority-list li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+.priority-list li:last-child { border-bottom: none; }
+.p-num {
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: var(--blue); color: #fff; border-radius: 50%;
+  font-size: 13px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.p-txt { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; }
+
+/* ── ADMIN ───────────────────────────────────────────────── */
+.admin-bar { background: var(--ink); color: #fff; padding: 12px 20px; display: flex; align-items: center; gap: 10px; }
+.admin-pill { background: var(--red); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px; }
+.rank-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  margin-bottom: 6px; box-shadow: var(--shadow);
+}
+.rank-pos { width: 28px; height: 28px; flex-shrink: 0; background: var(--blue-pale); color: var(--blue); border-radius: 6px; font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.rank-pos.top { background: var(--blue); color: #fff; }
+.rank-title { font-size: 13px; font-weight: 600; flex: 1; line-height: 1.3; }
+.rank-bar-w { width: 72px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+.rank-bar { height: 100%; background: var(--blue); border-radius: 3px; }
+.rank-score { font-size: 11px; font-weight: 700; color: var(--ink-3); white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px 3px 7px; font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 3px; }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); flex-shrink: 0; }
+.chip .rm { cursor: pointer; color: var(--ink-4); margin-left: 2px; font-size: 13px; }
+.chip .rm:hover { color: var(--red); }
+.stat-g { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+.stat { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px; text-align: center; }
+.stat-v { font-size: 26px; font-weight: 800; margin-bottom: 3px; }
+.stat-l { font-size: 11px; color: var(--ink-3); }
+.ftab { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: var(--surface); color: var(--ink-3); transition: all .15s; white-space: nowrap; }
+.ftab.on { border-color: var(--blue); background: var(--blue-pale); color: var(--blue); }
+.g-sect { margin-bottom: 18px; }
+.g-title { font-size: 13px; font-weight: 700; color: var(--blue); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--blue-mid); }
+
+/* ── UTILITY ─────────────────────────────────────────────── */
+.mt2{margin-top:8px}.mt3{margin-top:12px}.mt4{margin-top:18px}.mt6{margin-top:24px}
+.mb2{margin-bottom:8px}.mb3{margin-bottom:12px}.mb4{margin-bottom:16px}
+.flex{display:flex}.items-c{align-items:center}.j-between{justify-content:space-between}.gap2{gap:8px}.gap3{gap:12px}
+.text-c{text-align:center}.hidden{display:none!important}
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+textarea.inp{resize:vertical;min-height:70px;font-family:monospace;font-size:12px}
+.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-4);margin-bottom:10px}
+
+/* ── SELECTION COUNTER ───────────────────────────────────── */
+.sel-counter {
+  position: sticky; top: 52px; z-index: 100;
+  background: rgba(255,255,255,.95); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+}
+.sel-counter-in {
+  max-width: 680px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.counter-dots { display: flex; gap: 5px; }
+.counter-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--border); border: 2px solid var(--border-2);
+  transition: all .2s;
+}
+.counter-dot.filled { background: var(--blue); border-color: var(--blue); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr" id="appHdr">
+  <div class="hdr-in">
+    <div class="hdr-brand">
+      <span class="hdr-pill">PMO</span>
+      <span class="hdr-name">Evaluación de Prioridades</span>
+    </div>
+    <span class="hdr-step" id="hdrStep"></span>
+  </div>
+  <div class="prog"><div class="prog-bar" id="progBar" style="width:0%"></div></div>
+</header>
+
+<!-- ════════════ PAGE: LANDING ════════════ -->
+<div class="page on" id="pg-landing">
+  <div class="wrap">
+
+    <div class="hero mt4">
+      <div class="hero-eyebrow">Avila Tek · PMO</div>
+      <div id="periodBadge" style="display:none;background:var(--blue-pale);color:var(--blue);border:1px solid var(--blue-mid);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;margin-bottom:12px"></div>
+      <h1>¿Qué resultados esperas<br>de la PMO?</h1>
+      <p class="lead mt3">Esta evaluación identifica los resultados esperados desde la perspectiva de cada rol involucrado con la PMO, para orientar sus servicios hacia lo que realmente importa.</p>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Objetivo</div>
+      <p class="lead" style="font-size:14px">Conocer y comparar las prioridades de los distintos roles de la organización en relación con la PMO, permitiendo alinear los servicios del equipo con las necesidades reales de cada grupo de clientes internos.</p>
+
+      <hr class="divider">
+
+      <div class="section-label">Cómo completar esta evaluación</div>
+      <ul class="steps">
+        <li>
+          <span class="step-n">1</span>
+          <div class="step-body">
+            <strong>Identifícate</strong>
+            <p>Ingresa tu nombre y selecciona el grupo que mejor representa tu rol en relación con la PMO.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-n">2</span>
+          <div class="step-body">
+            <strong>Lee los 30 resultados esperados</strong>
+            <p>Cada resultado incluye su título y una <em>señal de necesidad</em> — una descripción de las situaciones o síntomas que indican que esa área requiere atención. Úsala para evaluar qué tan relevante es para tu contexto.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-n">3</span>
+          <div class="step-body">
+            <strong>Selecciona y ordena tus 5 prioridades</strong>
+            <p>Elige los 5 resultados que consideres más urgentes o importantes para la PMO <em>desde tu perspectiva</em>. El orden importa: el <strong>#1 es el más prioritario</strong>, el #5 el menos.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-n">4</span>
+          <div class="step-body">
+            <strong>Revisa y confirma</strong>
+            <p>Antes de enviar verás un resumen de tu ranking. Podrás ajustarlo si lo deseas.</p>
+          </div>
+        </li>
+      </ul>
+
+      <hr class="divider">
+      <p class="caption" style="font-size:11px">Tiempo estimado: 8–10 min.</p>
+    </div>
+
+    <button class="btn btn-primary btn-lg btn-block mt4" onclick="nav('pg-info')">Comenzar evaluación →</button>
+  </div>
+</div>
+
+<!-- ════════════ PAGE: INFO ════════════ -->
+<div class="page" id="pg-info">
+  <div class="wrap">
+    <div class="card mt4">
+      <h2 class="mb2">¿Quién responde?</h2>
+      <p class="lead mb4" style="font-size:14px">Tu perspectiva se analizará de acuerdo a tu rol. Esta información es confidencial y solo se usa para agrupar los resultados.</p>
+      <div class="fg">
+        <label class="lbl">Nombre</label>
+        <input type="text" class="inp" id="fName" placeholder="Tu nombre completo">
+      </div>
+      <div class="fg">
+        <label class="lbl">Tu rol en relación con la PMO</label>
+        <select class="sel" id="fGroup">
+          <option value="">— Selecciona tu rol —</option>
+          <option value="C-level (directiva)">C-level (directiva)</option>
+          <option value="Gerentes y coordinadores">Gerentes y coordinadores</option>
+          <option value="Tech leads">Tech leads</option>
+          <option value="Product manager">Product manager</option>
+          <option value="Project manager">Project manager</option>
+          <option value="Quality assurance (QA)">Quality assurance (QA)</option>
+          <option value="Desarrolladores">Desarrolladores</option>
+          <option value="Product designers">Product designers</option>
+          <option value="Talent Acquisition &amp; Development">Talent Acquisition &amp; Development</option>
+          <option value="Comercial / Mercadeo">Comercial / Mercadeo</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="nav-foot">
+    <div class="nav-foot-in">
+      <button class="btn btn-ghost" onclick="nav('pg-landing')">← Atrás</button>
+      <button class="btn btn-primary" id="btnInfo" onclick="goToSelect()" disabled>Continuar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ PAGE: SELECTION ════════════ -->
+<div class="page" id="pg-select">
+  <!-- Sticky counter bar -->
+  <div class="sel-counter">
+    <div class="sel-counter-in">
+      <div>
+        <span style="font-size:13px;font-weight:700;color:var(--ink-2)">Selecciona tus 5 prioridades</span>
+        <span class="caption" style="margin-left:8px" id="selHint">0 de 5 seleccionadas</span>
+      </div>
+      <div class="counter-dots" id="counterDots"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="outcomesList" class="mt3"></div>
+  </div>
+
+  <!-- Tray -->
+  <div class="tray">
+    <div class="tray-in">
+      <div class="tray-top">
+        <span class="tray-label">Mis prioridades</span>
+        <span class="tray-counter" id="trayCount">0 / 5</span>
+      </div>
+      <div class="tray-slots" id="traySlots"></div>
+      <div class="tray-actions">
+        <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="nav('pg-info')">← Atrás</button>
+        <button class="btn btn-primary" id="btnReview" onclick="nav('pg-review')" disabled>Revisar orden →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ PAGE: REVIEW ════════════ -->
+<div class="page" id="pg-review">
+  <div class="wrap">
+    <div class="card mt4">
+      <h2 class="mb2">Confirma tu ranking</h2>
+      <p class="lead mb4" style="font-size:14px">Este es el orden de tus 5 prioridades. El <strong>#1 tiene el mayor peso</strong> en el análisis. Usa las flechas para ajustar o ✕ para eliminar y cambiar una selección.</p>
+      <div id="reviewList"></div>
+    </div>
+    <div class="alert alert-blue mt3">
+      💡 Recuerda: el <strong>#1</strong> representa lo que consideras más urgente o importante desde tu perspectiva actual.
+    </div>
+  </div>
+  <div class="nav-foot">
+    <div class="nav-foot-in">
+      <button class="btn btn-ghost" onclick="nav('pg-select')">← Ajustar</button>
+      <button class="btn btn-success btn-lg" onclick="submitResponse()" id="btnSubmit">Enviar evaluación ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ PAGE: DONE ════════════ -->
+<div class="page" id="pg-done">
+  <div class="wrap">
+    <div class="done-hero mt4">
+      <div class="done-icon">🙏</div>
+      <h1>¡Muchas gracias!</h1>
+      <p class="lead mt2" id="doneMsg"></p>
+    </div>
+
+    <div class="card" id="donePriorities">
+      <div class="section-label mb3">Tu ranking de prioridades</div>
+      <ul class="priority-list" id="priorityList"></ul>
+    </div>
+
+    <div class="card mt3" id="doneCode" style="display:none">
+      <h3 class="mb2">📋 Código de respaldo</h3>
+      <p class="lead mb3" style="font-size:13px">No se pudo guardar automáticamente. Copia este código y envíaselo a Pedro por Lark.</p>
+      <textarea class="inp" id="codeArea" rows="3" readonly onclick="this.select()"></textarea>
+      <button class="btn btn-ghost mt3" onclick="copyCode()" id="btnCopy">Copiar código</button>
+    </div>
+
+    <button class="btn btn-ghost btn-block mt4" onclick="resetAll()">↩ Responder de nuevo</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SCRIPT
+════════════════════════════════════════ -->
+<script>
+// ── CONFIG ──────────────────────────────
+const CFG = {
+  supabase_url: 'https://yhmrxwloxwkjatxoqxhs.supabase.co',
+  supabase_key: 'sb_publishable_XZQk6N1xCuiSCJB10CbcHw_GkFuyJhJ',
+  table: 'pmo_responses'
+};
+let sbClient = null;
+
+// ── OUTCOMES DATA ─────────────────────────
+// Title + full "Prueba de necesidad" for each of the 30 outcomes
+const OUTCOMES = [
+  { id:1,  title:'Mayor disponibilidad de recursos cualificados', signal:'Dificultad para encontrar y retener recursos cualificados para gestionar programas y proyectos. Los proyectos frecuentemente se ven afectados por falta de personal con experiencia.' },
+  { id:2,  title:'Mejor gestión del cambio organizacional', signal:'Resistencia al cambio, procesos interrumpidos y menor eficacia durante las transiciones. Las iniciativas de cambio generan fricción y no logran los resultados esperados.' },
+  { id:3,  title:'Mejor control sobre los equipos de proyecto', signal:'Falta de responsabilidad, líneas jerárquicas poco claras y dificultad para gestionar equipos. Los miembros del equipo no asumen sus responsabilidades con claridad.' },
+  { id:4,  title:'Mejor definición de roles y responsabilidades', signal:'Confusión y solapamiento de responsabilidades generan ineficacia en los equipos de proyecto. No queda claro quién debe hacer qué en cada iniciativa.' },
+  { id:5,  title:'Mejor priorización de proyectos', signal:'Mala asignación de recursos, conflicto de prioridades e incapacidad para centrarse en proyectos de alto impacto. Los recursos se dispersan entre muchas iniciativas sin criterio claro.' },
+  { id:6,  title:'Mejor calidad de los resultados del proyecto', signal:'Entregables de calidad inferior, partes interesadas insatisfechas e impacto negativo en la reputación de la organización. Los proyectos no cumplen los estándares esperados.' },
+  { id:7,  title:'Mejor gestión del talento', signal:'Elevados índices de rotación y dificultades para atraer y retener al personal clave en gestión de proyectos y productos.' },
+  { id:8,  title:'Transferencia eficaz de conocimientos', signal:'Prácticas inconsistentes y pérdida de conocimientos cuando los miembros del equipo cambian de proyecto o salen de la organización.' },
+  { id:9,  title:'Toma de decisiones mejorada', signal:'Dificultad para tomar decisiones informadas debido a la falta de datos oportunos, confiables y bien estructurados sobre el avance de los proyectos.' },
+  { id:10, title:'Mejor experiencia del cliente del proyecto', signal:'Baja satisfacción del cliente por una deficiente entrega del proyecto o por falta de comunicación efectiva durante su ejecución.' },
+  { id:11, title:'Mejor gestión de recursos', signal:'Asignación ineficiente, con recursos infrautilizados o sobreasignados. La distribución del trabajo no responde a la capacidad real del equipo.' },
+  { id:12, title:'Mayor alineación con los objetivos estratégicos', signal:'Proyectos que no contribuyen a los objetivos de la organización o que pierden el foco estratégico durante su ejecución.' },
+  { id:13, title:'Mayor integración entre áreas de la organización', signal:'Falta de colaboración interfuncional y ejecución inconexa de proyectos. Las áreas trabajan en silos sin visibilidad compartida.' },
+  { id:14, title:'Mayor retorno de la inversión (ROI)', signal:'Baja rentabilidad de programas o proyectos e incapacidad para demostrar el valor generado por las iniciativas.' },
+  { id:15, title:'Mayor disponibilidad de información', signal:'Acceso limitado a la información del proyecto, lo que genera decisiones desinformadas y pérdida de tiempo buscando datos dispersos.' },
+  { id:16, title:'Mejor colaboración y comunicación', signal:'Mala comunicación, falta de transparencia y escasa colaboración entre equipos. La información clave no llega a quien la necesita.' },
+  { id:17, title:'Mayor compromiso organizacional con los resultados', signal:'Falta de atención a los resultados del proyecto e insuficiente accountability en la organización. Los compromisos adquiridos no se sostienen.' },
+  { id:18, title:'Mejor gestión del presupuesto del proyecto', signal:'Frecuentes excesos presupuestarios e ineficiencias financieras. Los proyectos no se ejecutan dentro de los márgenes financieros acordados.' },
+  { id:19, title:'Mejor relación con los clientes del proyecto', signal:'Relaciones tensas con los clientes por expectativas no gestionadas, incumplimientos o comunicación insuficiente.' },
+  { id:20, title:'Mejor gestión del desempeño', signal:'La falta de seguimiento al rendimiento hace que los problemas se detecten tarde o no se corrijan a tiempo, afectando los resultados.' },
+  { id:21, title:'Mejores tasas de éxito de proyectos', signal:'Frecuentes fracasos de programas y proyectos, retrasos significativos o entregables que no cumplen las expectativas acordadas.' },
+  { id:22, title:'Mayor confiabilidad de la información', signal:'Datos del proyecto inexactos, obsoletos o inconsistentes que generan desconfianza en los reportes y dificultan la toma de decisiones.' },
+  { id:23, title:'Mejor involucramiento de los interesados', signal:'Desconexión de los interesados clave y falta de compromiso con los resultados del proyecto. Los stakeholders no se sienten parte del proceso.' },
+  { id:24, title:'Mayor aprendizaje organizacional', signal:'Errores que se repiten y una incapacidad de aprovechar las lecciones aprendidas de proyectos anteriores para mejorar la gestión.' },
+  { id:25, title:'Mayor productividad en los proyectos', signal:'Bajo rendimiento del equipo, procesos ineficaces y resultados por debajo de lo esperado dado el tiempo y recursos invertidos.' },
+  { id:26, title:'Mayor visibilidad del avance del proyecto', signal:'Conocimiento limitado del estado real del proyecto, lo que genera sorpresas, decisiones tardías y pérdida de control.' },
+  { id:27, title:'Pronóstico de proyectos más preciso', signal:'Inexactitudes en plazos y presupuestos que resultan en compromisos poco realistas con clientes y directivos.' },
+  { id:28, title:'Reducción de la exposición al riesgo', signal:'Alta incertidumbre y contratiempos inesperados que afectan los proyectos. Los riesgos no se identifican ni gestionan de forma proactiva.' },
+  { id:29, title:'Gobernanza y cumplimiento más estrictos', signal:'Incumplimiento de regulaciones del sector, políticas internas o marcos de gobernanza organizacional en la ejecución de proyectos.' },
+  { id:30, title:'Reducción del ciclo de vida del proyecto', signal:'Proyectos que se prolongan innecesariamente, retrasando la entrega de valor al negocio y generando sobrecostos acumulados.' }
+];
+
+// ── STATE ─────────────────────────────────
+let S = { name:'', group:'', selected:[] };
+let activePeriod = null;
+
+// ── INIT ──────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  if (CFG.supabase_url && CFG.supabase_key) {
+    try { sbClient = supabase.createClient(CFG.supabase_url, CFG.supabase_key); } catch(e) {}
+  }
+  // Info page listeners
+  document.getElementById('fName').addEventListener('input', checkInfo);
+  document.getElementById('fGroup').addEventListener('change', checkInfo);
+  renderCounterDots();
+
+  // ── Period validation ──────────────────
+  const token = new URLSearchParams(window.location.search).get('period');
+  if (token && sbClient) {
+    const { data } = await sbClient
+      .from('pmo_periods')
+      .select('*')
+      .eq('token', token)
+      .eq('type', 'results')
+      .maybeSingle();
+
+    if (!data) {
+      showPeriodError('Enlace no válido', 'Este enlace no corresponde a ninguna evaluación. Contacta al administrador para obtener el enlace correcto.');
+      return;
+    }
+    if (data.status === 'closed') {
+      showPeriodError('Evaluación cerrada', `El período <strong>${data.name}</strong> ya fue cerrado. Ya no se aceptan respuestas.`);
+      return;
+    }
+    if (data.closes_at && new Date(data.closes_at) < new Date()) {
+      showPeriodError('Evaluación vencida', `El período <strong>${data.name}</strong> venció el ${new Date(data.closes_at).toLocaleDateString('es-VE',{day:'2-digit',month:'long',year:'numeric'})}.`);
+      return;
+    }
+    activePeriod = data;
+    const badge = document.getElementById('periodBadge');
+    if (badge) { badge.textContent = '📅 ' + data.name; badge.style.display = 'inline-block'; }
+  }
+});
+
+function showPeriodError(title, msg) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.getElementById('pg-landing').classList.add('on');
+  document.getElementById('pg-landing').innerHTML = `
+    <div class="wrap" style="display:flex;align-items:center;justify-content:center;min-height:80vh">
+      <div style="text-align:center;max-width:420px;padding:40px 24px">
+        <div style="font-size:48px;margin-bottom:16px">🔒</div>
+        <h2 style="font-size:22px;font-weight:800;margin-bottom:10px">${title}</h2>
+        <p style="color:var(--ink-3);font-size:15px;line-height:1.65">${msg}</p>
+      </div>
+    </div>`;
+}
+
+// ── NAVIGATION ────────────────────────────
+function nav(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  window.scrollTo({top:0, behavior:'instant'});
+  const prog = {
+    'pg-landing':0,'pg-info':15,'pg-select':35,'pg-review':75,'pg-done':100
+  };
+  document.getElementById('progBar').style.width = (prog[id]||0) + '%';
+  const steps = {'pg-landing':'','pg-info':'Paso 1 de 3','pg-select':'Paso 2 de 3','pg-review':'Paso 3 de 3','pg-done':'Completado'};
+  document.getElementById('hdrStep').textContent = steps[id]||'';
+  if (id === 'pg-review') renderReview();
+  if (id === 'pg-select') renderOutcomes();
+}
+
+// ── INFO PAGE ─────────────────────────────
+function checkInfo() {
+  document.getElementById('btnInfo').disabled =
+    !(document.getElementById('fName').value.trim() && document.getElementById('fGroup').value);
+}
+
+function goToSelect() {
+  S.name = document.getElementById('fName').value.trim();
+  S.group = document.getElementById('fGroup').value;
+  S.selected = [];
+  nav('pg-select');
+}
+
+// ── OUTCOMES RENDERING ────────────────────
+function renderOutcomes() {
+  const html = OUTCOMES.map(o => {
+    const idx = S.selected.indexOf(o.id);
+    const isSelected = idx >= 0;
+    const isDisabled = !isSelected && S.selected.length >= 5;
+    const numDisplay = isSelected ? idx + 1 : o.id;
+    return `
+      <div class="oc ${isSelected?'selected':''} ${isDisabled?'disabled':''}" id="oc-${o.id}" onclick="toggleOutcome(${o.id})">
+        <div class="oc-left">
+          <div class="oc-num">${isSelected ? numDisplay : o.id}</div>
+        </div>
+        <div class="oc-body">
+          <div class="oc-title">${o.title}</div>
+          <div class="oc-signal">
+            <strong>Señal de necesidad · </strong>${o.signal}
+          </div>
+        </div>
+        <div class="oc-check"></div>
+      </div>`;
+  }).join('');
+  document.getElementById('outcomesList').innerHTML = html;
+  renderTray();
+  renderCounterDots();
+  document.getElementById('selHint').textContent = `${S.selected.length} de 5 seleccionadas`;
+  document.getElementById('trayCount').textContent = `${S.selected.length} / 5`;
+  document.getElementById('btnReview').disabled = S.selected.length !== 5;
+}
+
+function toggleOutcome(id) {
+  const idx = S.selected.indexOf(id);
+  if (idx >= 0) {
+    S.selected.splice(idx, 1);
+  } else {
+    if (S.selected.length >= 5) return;
+    S.selected.push(id);
+  }
+  renderOutcomes();
+}
+
+function renderTray() {
+  document.getElementById('traySlots').innerHTML = Array.from({length:5}, (_,i) => {
+    const id = S.selected[i];
+    if (id) {
+      const o = OUTCOMES.find(x => x.id === id);
+      return `<div class="tray-slot filled">
+        <span class="tray-slot-n">${i+1}</span>
+        <span class="tray-slot-txt">${o.title}</span>
+        <span class="tray-slot-rm" onclick="removeFromTray(${id},event)">✕</span>
+      </div>`;
+    }
+    return `<div class="tray-slot">
+      <span class="tray-slot-n">${i+1}</span>
+      <span class="tray-slot-txt" style="color:var(--ink-4)">Sin seleccionar</span>
+    </div>`;
+  }).join('');
+}
+
+function removeFromTray(id, e) {
+  e.stopPropagation();
+  const idx = S.selected.indexOf(id);
+  if (idx >= 0) S.selected.splice(idx, 1);
+  renderOutcomes();
+}
+
+function renderCounterDots() {
+  document.getElementById('counterDots').innerHTML = Array.from({length:5}, (_,i) =>
+    `<div class="counter-dot ${i < S.selected.length ? 'filled' : ''}"></div>`
+  ).join('');
+}
+
+// ── REVIEW PAGE ───────────────────────────
+function renderReview() {
+  document.getElementById('reviewList').innerHTML = S.selected.map((id, i) => {
+    const o = OUTCOMES.find(x => x.id === id);
+    return `
+      <div class="rv-item">
+        <div class="rv-rank">${i+1}</div>
+        <div class="rv-title">${o.title}</div>
+        <div class="rv-controls">
+          <button onclick="moveUp(${i})" ${i===0?'disabled':''} title="Subir">▲</button>
+          <button onclick="moveDown(${i})" ${i===S.selected.length-1?'disabled':''} title="Bajar">▼</button>
+        </div>
+        <span class="rv-rm" onclick="removeReview(${i})" title="Eliminar">✕</span>
+      </div>`;
+  }).join('');
+}
+
+function moveUp(i) {
+  if (i > 0) { [S.selected[i-1], S.selected[i]] = [S.selected[i], S.selected[i-1]]; renderReview(); }
+}
+function moveDown(i) {
+  if (i < S.selected.length-1) { [S.selected[i], S.selected[i+1]] = [S.selected[i+1], S.selected[i]]; renderReview(); }
+}
+function removeReview(i) {
+  S.selected.splice(i, 1);
+  nav('pg-select');
+  document.getElementById('btnReview').disabled = true;
+}
+
+// ── SUBMIT ────────────────────────────────
+async function submitResponse() {
+  const btn = document.getElementById('btnSubmit');
+  btn.textContent = 'Enviando…'; btn.disabled = true;
+
+  const payload = {
+    name: S.name,
+    customer_group: S.group,
+    priority_1: S.selected[0] || null,
+    priority_2: S.selected[1] || null,
+    priority_3: S.selected[2] || null,
+    priority_4: S.selected[3] || null,
+    priority_5: S.selected[4] || null,
+    period_id: activePeriod?.id || null,
+    created_at: new Date().toISOString()
+  };
+
+  let saved = false, saveErr = '';
+  if (CFG.supabase_url && CFG.supabase_key) {
+    try {
+      if (!sbClient) sbClient = supabase.createClient(CFG.supabase_url, CFG.supabase_key);
+      const { error } = await sbClient.from(CFG.table).insert(payload);
+      if (error) { saveErr = error.message; } else { saved = true; }
+    } catch(e) { saveErr = e.message; }
+  } else { saveErr = 'Supabase no configurado'; }
+
+  btn.textContent = 'Enviar evaluación ✓'; btn.disabled = false;
+
+  // Done screen
+  const first = S.name.split(' ')[0];
+  document.getElementById('doneMsg').textContent = saved
+    ? `${first}, tu evaluación fue guardada exitosamente. Tu opinión ayudará a la PMO a priorizar los servicios de mayor impacto para tu rol.`
+    : `${first}, gracias por completar la evaluación. ${saveErr ? 'Usa el código de respaldo para compartir tu respuesta.' : ''}`;
+
+  document.getElementById('priorityList').innerHTML = S.selected.map((id, i) => {
+    const o = OUTCOMES.find(x => x.id === id);
+    return `<li><div class="p-num">${i+1}</div><div class="p-txt">${o.title}</div></li>`;
+  }).join('');
+
+  if (!saved) {
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify({v:2,...payload}))));
+    document.getElementById('codeArea').value = code;
+    document.getElementById('doneCode').style.display = 'block';
+  } else {
+    document.getElementById('doneCode').style.display = 'none';
+  }
+
+  nav('pg-done');
+}
+
+function copyCode() {
+  document.getElementById('codeArea').select();
+  document.execCommand('copy');
+  const b = document.getElementById('btnCopy');
+  b.textContent = '✓ Copiado'; setTimeout(()=>b.textContent='Copiar código',2000);
+}
+
+function resetAll() {
+  S = { name:'', group:'', selected:[] };
+  document.getElementById('fName').value = '';
+  document.getElementById('fGroup').value = '';
+  document.getElementById('btnInfo').disabled = true;
+  nav('pg-landing');
+}
+
+</script>
+</body>
+</html>
